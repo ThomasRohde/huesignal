@@ -9,13 +9,13 @@ from huesignal.effects.colors import rgb_to_xy
 
 # Rainbow colors in RGB
 RAINBOW_COLORS = [
-    (255, 0, 0),      # Red
-    (255, 127, 0),    # Orange
-    (255, 255, 0),    # Yellow
-    (0, 255, 0),      # Green
-    (0, 0, 255),      # Blue
-    (75, 0, 130),     # Indigo
-    (148, 0, 211),    # Violet
+    (255, 0, 0),  # Red
+    (255, 127, 0),  # Orange
+    (255, 255, 0),  # Yellow
+    (0, 255, 0),  # Green
+    (0, 0, 255),  # Blue
+    (75, 0, 130),  # Indigo
+    (148, 0, 211),  # Violet
 ]
 
 
@@ -76,9 +76,7 @@ class Rainbow(Effect):
         if non_color_lights:
             await self._apply_brightness_wave(non_color_lights, num_steps, step_duration)
 
-    async def _apply_color_cycle(
-        self, light_ids: list[str], num_steps: int, step_duration: float
-    ) -> None:
+    async def _apply_color_cycle(self, light_ids: list[str], num_steps: int, step_duration: float) -> None:
         """Cycle colors on color-capable lights.
 
         Args:
@@ -101,21 +99,16 @@ class Rainbow(Effect):
                     continue
 
                 try:
-                    await self.bridge.lights.set_color(
-                        light_id,
-                        xy=xy,
-                        transition_time=int(step_duration)
-                    )
+                    await self.bridge.lights.set_color(light_id, xy=xy, transition_time=int(step_duration))
                 except Exception as e:
                     import logging
+
                     logging.debug(f"Failed to set color for {light_id}: {e}")
 
             # Wait before next step
             await asyncio.sleep(step_duration / 1000.0)
 
-    async def _apply_brightness_wave(
-        self, light_ids: list[str], num_steps: int, step_duration: float
-    ) -> None:
+    async def _apply_brightness_wave(self, light_ids: list[str], num_steps: int, step_duration: float) -> None:
         """Create brightness wave on non-color lights.
 
         Args:
@@ -152,6 +145,7 @@ class Rainbow(Effect):
                     )
                 except Exception as e:
                     import logging
+
                     logging.debug(f"Failed to set brightness for {light_id}: {e}")
 
             # Wait before next step

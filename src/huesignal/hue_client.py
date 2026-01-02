@@ -1,6 +1,5 @@
 """Async wrapper for aiohue library with connection and session management."""
 
-
 import aiohttp
 from aiohue.v2 import HueBridgeV2
 
@@ -74,9 +73,7 @@ class HueClient:
                 except Exception:
                     pass
                 self._bridge = None
-            raise HueConnectionError(
-                f"Failed to connect to Hue bridge at {self.bridge_ip}: {e}"
-            ) from e
+            raise HueConnectionError(f"Failed to connect to Hue bridge at {self.bridge_ip}: {e}") from e
         except Exception as e:
             # Clean up bridge on any other error
             if self._bridge:
@@ -85,9 +82,7 @@ class HueClient:
                 except Exception:
                     pass
                 self._bridge = None
-            raise HueConnectionError(
-                f"Unexpected error connecting to Hue bridge: {e}"
-            ) from e
+            raise HueConnectionError(f"Unexpected error connecting to Hue bridge: {e}") from e
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit async context manager - cleanup bridge connection.

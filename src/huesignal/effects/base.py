@@ -147,6 +147,7 @@ class Effect(ABC):
         except Exception as e:
             # Log error but continue with other lights
             import logging
+
             logging.debug(f"Failed to set light state for {light_id}: {e}")
 
 

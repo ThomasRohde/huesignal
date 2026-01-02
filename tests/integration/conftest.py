@@ -8,9 +8,7 @@ import pytest
 def pytest_configure(config):
     """Configure pytest for integration tests."""
     # Mark integration tests
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test that requires hardware"
-    )
+    config.addinivalue_line("markers", "integration: mark test as an integration test that requires hardware")
 
 
 @pytest.fixture(scope="session")

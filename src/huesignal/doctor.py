@@ -1,6 +1,5 @@
 """Diagnostic checks for huesignal."""
 
-
 from huesignal.auth import get_app_key
 from huesignal.discovery import discover_bridges, discover_bridges_mdns
 from huesignal.hue_client import HueClient, HueConnectionError
@@ -95,7 +94,9 @@ async def run_doctor(bridge_ip: str | None = None, verbose: bool = False) -> Doc
         async with HueClient(bridge_ip, app_key) as client:
             # Try to fetch lights to verify connection works
             lights_controller = client.bridge.lights
-            light_count = len(lights_controller.items) if lights_controller and hasattr(lights_controller, 'items') else 0
+            light_count = (
+                len(lights_controller.items) if lights_controller and hasattr(lights_controller, "items") else 0
+            )
             status.add_check("Bridge Connectivity", True, f"Connected successfully ({light_count} lights found)")
             logger.debug(f"Successfully connected to bridge. Found {light_count} lights.")
     except HueConnectionError as e:

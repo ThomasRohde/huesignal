@@ -21,20 +21,20 @@ def _get_light_info_from_device(bridge: HueBridgeV2, light_id: str) -> tuple[str
         Tuple of (device_name, is_reachable)
     """
     for device in bridge.devices.items:
-        if hasattr(device, 'services'):
+        if hasattr(device, "services"):
             for service in device.services:
-                if service.rtype.value == 'light' and service.rid == light_id:
-                    device_name = device.metadata.name if hasattr(device, 'metadata') else "Unknown"
+                if service.rtype.value == "light" and service.rid == light_id:
+                    device_name = device.metadata.name if hasattr(device, "metadata") else "Unknown"
 
                     # Check connectivity status from zigbee_connectivity service
                     is_reachable = True  # Default to true
-                    if hasattr(bridge, 'zigbee_connectivity'):
+                    if hasattr(bridge, "zigbee_connectivity"):
                         for conn_service in device.services:
-                            if conn_service.rtype.value == 'zigbee_connectivity':
+                            if conn_service.rtype.value == "zigbee_connectivity":
                                 zigbee_conn = bridge.zigbee_connectivity.get(conn_service.rid)
                                 if zigbee_conn:
                                     # In v2 API, status "connected" means reachable
-                                    is_reachable = getattr(zigbee_conn, 'status', None) == 'connected'
+                                    is_reachable = getattr(zigbee_conn, "status", None) == "connected"
                                 break
 
                     return device_name, is_reachable
@@ -77,10 +77,7 @@ async def list_lights(
             logger.debug(f"Using cached light list for {bridge_ip}: {len(cached)} light(s)")
             # Apply filter to cached data if needed
             if filter_name:
-                filtered = [
-                    light for light in cached
-                    if filter_name.lower() in light["name"].lower()
-                ]
+                filtered = [light for light in cached if filter_name.lower() in light["name"].lower()]
                 return {"lights": filtered, "count": len(filtered)}
             return {"lights": cached, "count": len(cached)}
 
@@ -116,10 +113,7 @@ async def list_lights(
 
         # Apply filter if requested
         if filter_name:
-            filtered_lights = [
-                light for light in all_lights
-                if filter_name.lower() in light["name"].lower()
-            ]
+            filtered_lights = [light for light in all_lights if filter_name.lower() in light["name"].lower()]
             return {"lights": filtered_lights, "count": len(filtered_lights)}
 
         return {"lights": all_lights, "count": len(all_lights)}

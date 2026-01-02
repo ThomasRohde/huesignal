@@ -49,10 +49,7 @@ def parse_color(color_str: str) -> tuple[int, int, int]:
 
     # Validate hex format
     if not re.match(r"^[0-9a-f]{6}$", hex_str):
-        raise ValueError(
-            f"Invalid color: {color_str}. "
-            f"Use color name (e.g., 'red') or hex code (e.g., '#FF0000')"
-        )
+        raise ValueError(f"Invalid color: {color_str}. Use color name (e.g., 'red') or hex code (e.g., '#FF0000')")
 
     # Convert hex to RGB
     r = int(hex_str[0:2], 16)

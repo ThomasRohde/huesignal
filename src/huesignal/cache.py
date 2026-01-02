@@ -148,10 +148,7 @@ class CacheManager:
         now = time.time()
         pruned = 0
 
-        keys_to_delete = [
-            key for key, entry in cache.items()
-            if "expires_at" in entry and now > entry["expires_at"]
-        ]
+        keys_to_delete = [key for key, entry in cache.items() if "expires_at" in entry and now > entry["expires_at"]]
 
         for key in keys_to_delete:
             del cache[key]

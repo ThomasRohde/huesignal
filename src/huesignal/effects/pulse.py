@@ -42,6 +42,7 @@ class Pulse(Effect):
         repeated count times.
         """
         import logging
+
         logger = logging.getLogger(__name__)
 
         # Capture original state for each light
@@ -87,10 +88,7 @@ class Pulse(Effect):
                 if "brightness" in original:
                     try:
                         await self.bridge.lights.set_state(
-                            light_id,
-                            on=True,
-                            brightness=original["brightness"],
-                            transition_time=self.interval_ms
+                            light_id, on=True, brightness=original["brightness"], transition_time=self.interval_ms
                         )
                         logger.debug(f"Restored brightness to: {original['brightness']}")
                     except Exception as e:

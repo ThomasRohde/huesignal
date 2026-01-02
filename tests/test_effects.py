@@ -1,6 +1,5 @@
 """Unit tests for effects validation and serialization."""
 
-
 import pytest
 
 from huesignal.effects.base import (

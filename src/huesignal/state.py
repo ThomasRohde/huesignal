@@ -43,30 +43,24 @@ class StateSnapshot:
 
     def to_json(self) -> str:
         """Serialize to JSON string."""
-        data = {
-            light_id: light.to_dict()
-            for light_id, light in self.lights.items()
-        }
+        data = {light_id: light.to_dict() for light_id, light in self.lights.items()}
         return json.dumps(data)
 
     @classmethod
     def from_json(cls, json_str: str) -> "StateSnapshot":
         """Deserialize from JSON string."""
         data = json.loads(json_str)
-        lights = {
-            light_id: LightState.from_dict(light_data)
-            for light_id, light_data in data.items()
-        }
+        lights = {light_id: LightState.from_dict(light_data) for light_id, light_data in data.items()}
         return cls(lights=lights)
 
 
 def _get_light_name_from_device(bridge: HueBridgeV2, light_id: str) -> str:
     """Get light name by finding the device that contains this light."""
     for device in bridge.devices.items:
-        if hasattr(device, 'services'):
+        if hasattr(device, "services"):
             for service in device.services:
-                if service.rtype.value == 'light' and service.rid == light_id:
-                    if hasattr(device, 'metadata'):
+                if service.rtype.value == "light" and service.rid == light_id:
+                    if hasattr(device, "metadata"):
                         return device.metadata.name
     return light_id
 
@@ -109,9 +103,7 @@ async def capture_state(bridge: HueBridgeV2) -> StateSnapshot:
     return StateSnapshot(lights=lights)
 
 
-async def restore_state(
-    bridge: HueBridgeV2, snapshot: StateSnapshot, skip_lights: list | None = None
-) -> None:
+async def restore_state(bridge: HueBridgeV2, snapshot: StateSnapshot, skip_lights: list | None = None) -> None:
     """Restore lights to captured state.
 
     Args:

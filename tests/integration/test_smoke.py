@@ -48,7 +48,7 @@ async def test_list_lights(bridge_ip, app_key):
 @pytest.mark.asyncio
 async def test_toggle_light_with_restoration(bridge_ip, app_key):
     """Test toggling a light and restoring its original state.
-    
+
     This is a safe operation:
     1. Find first available light
     2. Capture its state

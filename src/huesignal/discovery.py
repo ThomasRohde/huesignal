@@ -84,6 +84,7 @@ async def discover_bridges_mdns(timeout: float = 1.0, use_cache: bool = True) ->
             if info and info.addresses:
                 # Convert IPv4 address bytes to string
                 import ipaddress
+
                 ip = str(ipaddress.IPv4Address(info.addresses[0]))
                 # Extract bridge ID from service name if possible
                 # Hue services are typically named like "Philips Hue - XXXX" or similar

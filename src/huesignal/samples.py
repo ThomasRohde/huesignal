@@ -1,14 +1,13 @@
 """Automation templates for huesignal integration."""
 
-
 SAMPLES: dict[str, str] = {
-    "powershell-exitcode": '''# PowerShell script that sets exit code based on huesignal success
+    "powershell-exitcode": """# PowerShell script that sets exit code based on huesignal success
 if (huesignal --bridge-ip {bridge_ip} effect apply disco --light {light_id}) {{
     exit 0
 }} else {{
     exit 1
-}}''',
-    "python-exitcode": '''#!/usr/bin/env python3
+}}""",
+    "python-exitcode": """#!/usr/bin/env python3
 # Python script that calls huesignal and propagates exit code
 import subprocess
 import sys
@@ -17,15 +16,15 @@ result = subprocess.run(
     ["huesignal", "--bridge-ip", "{bridge_ip}", "effect", "apply", "disco", "--light", "{light_id}"],
     capture_output=True
 )
-sys.exit(result.returncode)''',
-    "github-actions": '''# GitHub Actions workflow step for Hue notifications
+sys.exit(result.returncode)""",
+    "github-actions": """# GitHub Actions workflow step for Hue notifications
 - name: Notify via Philips Hue
   if: success()
   run: |
     huesignal --bridge-ip {bridge_ip} effect apply success --light {light_id}
   env:
-    HUE_APP_KEY: ${{{{ secrets.HUE_APP_KEY }}}}''',
-    "generic-agent-wrapper": '''#!/bin/bash
+    HUE_APP_KEY: ${{{{ secrets.HUE_APP_KEY }}}}""",
+    "generic-agent-wrapper": """#!/bin/bash
 # Generic wrapper for running tasks with Hue notifications
 BRIDGE_IP="{bridge_ip}"
 LIGHT_ID="{light_id}"
@@ -44,8 +43,8 @@ else
     huesignal --bridge-ip "$BRIDGE_IP" effect apply failure --light "$LIGHT_ID"
 fi
 
-exit $TASK_EXIT''',
-    "windows-task-scheduler": '''REM Windows Task Scheduler batch script
+exit $TASK_EXIT""",
+    "windows-task-scheduler": """REM Windows Task Scheduler batch script
 REM Run this as scheduled task to trigger Hue effects
 
 @echo off
@@ -70,7 +69,7 @@ if !mytime! geq 1800 if !mytime! lss 1900 (
     exit /b 0
 )
 
-exit /b 0''',
+exit /b 0""",
 }
 
 

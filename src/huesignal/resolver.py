@@ -49,10 +49,10 @@ def _get_light_name_from_device(bridge: HueBridgeV2, light_id: str) -> str:
     """
     # In Hue v2 API, names are stored in devices, not lights
     for device in bridge.devices.items:
-        if hasattr(device, 'services'):
+        if hasattr(device, "services"):
             for service in device.services:
-                if service.rtype.value == 'light' and service.rid == light_id:
-                    if hasattr(device, 'metadata'):
+                if service.rtype.value == "light" and service.rid == light_id:
+                    if hasattr(device, "metadata"):
                         return device.metadata.name
     return light_id  # Fallback to ID if no device name found
 
@@ -92,10 +92,10 @@ async def resolve_light(
 
         # Build light ID to name mapping from devices
         for device in bridge.devices.items:
-            if hasattr(device, 'services') and hasattr(device, 'metadata'):
+            if hasattr(device, "services") and hasattr(device, "metadata"):
                 device_name = device.metadata.name
                 for service in device.services:
-                    if service.rtype.value == 'light':
+                    if service.rtype.value == "light":
                         if device_name.lower() == light_name_lower:
                             # Exact case-insensitive match
                             matches.append((service.rid, device_name))

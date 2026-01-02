@@ -1,6 +1,5 @@
 """Error codes and custom exceptions for huesignal."""
 
-
 # Exit codes
 EXIT_SUCCESS = 0
 EXIT_GENERAL_ERROR = 1
