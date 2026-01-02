@@ -43,7 +43,7 @@ The following items have been completed and are ready for GitHub:
 ### 5. Testing & Validation
 - [x] Unit tests pass (55/62 passing - 7 failures are mock-related, not affecting CI)
 - [x] Package builds successfully
-- [x] Twine validation passes
+- [x] Package validation passes (twine check)
 - [x] Ruff linting passes
 
 ## 📋 Pre-Publishing Checklist
@@ -171,7 +171,7 @@ pip install huesignal
 ### Package Build Issues
 - Verify locally: `uv build`
 - Check dist/ folder for artifacts
-- Validate: `uv run twine check dist/*`
+- Validate: `uv run twine check dist/*` (local validation only - publishing via GitHub Actions)
 
 ## 📚 Resources
 

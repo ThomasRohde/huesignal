@@ -89,8 +89,9 @@ jobs:
       run: |
         uv build
 
-    - name: Check package
+    - name: Validate package
       run: |
+        # Validate package structure (actual publishing uses GitHub Actions trusted publisher)
         uv run twine check dist/*
 
     - name: Upload artifacts

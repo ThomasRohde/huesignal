@@ -44,6 +44,7 @@ uv run ruff check src/ tests/
 uv build
 
 # Validate package
+# Local validation only - publishing uses GitHub Actions trusted publisher
 uv run twine check dist/*
 
 # Install pre-commit hooks
@@ -87,7 +88,7 @@ The CI runs on:
 
 ✅ **Automated Testing**: Every PR is tested  
 ✅ **Code Quality**: Ruff enforces style  
-✅ **Package Validation**: Twine checks packages  
+✅ **Package Validation**: Local package checks (publishing via GitHub Actions trusted publisher)  
 ✅ **Cross-Platform**: Tests on Windows & Linux  
 ✅ **Multi-Version**: Tests Python 3.11-3.13  
 ✅ **Pre-commit Hooks**: Local quality checks  

@@ -56,7 +56,7 @@ The huesignal project has been thoroughly reviewed and prepared for GitHub publi
   - **Test matrix**: Python 3.11, 3.12, 3.13 on Ubuntu and Windows
   - **Test job**: Runs unit tests (excluding integration)
   - **Lint job**: Ruff formatting and linting checks
-  - **Build job**: Package building and twine validation
+  - **Build job**: Package building and package validation
   - **Artifact upload**: Distributable packages
 
 #### Issue Templates
@@ -96,7 +96,7 @@ Enhanced with:
 - Comprehensive dev dependencies:
   - pytest + pytest-asyncio + pytest-cov
   - ruff (linter & formatter)
-  - twine (package validation)
+  - twine (local package validation only - publishing uses GitHub Actions trusted publisher)
   - pre-commit
 - **Pytest configuration**:
   - Test discovery patterns
@@ -181,14 +181,14 @@ The GitHub Actions CI workflow will:
 3. **Check code formatting** with Ruff
 4. **Lint code** for common issues
 5. **Build package** distributions
-6. **Validate packages** with twine
+6. **Validate packages** locally (publishing uses GitHub Actions trusted publisher)
 7. **Upload artifacts** for download
 
 ### Expected CI Behavior
 - ✅ Tests will pass (55 passing tests, resolver test failures are isolated)
 - ✅ Linting will pass (Ruff configured appropriately)
 - ✅ Package builds will succeed
-- ✅ Twine validation will pass
+- ✅ Package validation will pass (twine check for local validation)
 
 ## 🛡️ Quality Assurance
 
