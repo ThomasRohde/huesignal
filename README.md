@@ -28,7 +28,7 @@ uv pip install huesignal
 Or install from source:
 
 ```bash
-git clone https://github.com/YOURUSERNAME/huesignal.git
+git clone https://github.com/ThomasRohde/huesignal.git
 cd huesignal
 uv sync
 uv run huesignal --version

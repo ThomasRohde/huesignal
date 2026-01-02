@@ -37,10 +37,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/YOURUSERNAME/huesignal"
-Documentation = "https://github.com/YOURUSERNAME/huesignal#readme"
-Repository = "https://github.com/YOURUSERNAME/huesignal"
-Issues = "https://github.com/YOURUSERNAME/huesignal/issues"
+Homepage = "https://github.com/ThomasRohde/huesignal"
+Documentation = "https://github.com/ThomasRohde/huesignal#readme"
+Repository = "https://github.com/ThomasRohde/huesignal"
+Issues = "https://github.com/ThomasRohde/huesignal/issues"
 
 [project.scripts]
 huesignal = "huesignal.__main__:main"

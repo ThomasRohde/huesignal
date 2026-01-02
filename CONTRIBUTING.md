@@ -37,7 +37,7 @@ This project follows a standard code of conduct. Please be respectful and constr
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/huesignal.git
+git clone https://github.com/ThomasRohde/huesignal.git
 cd huesignal
 
 # Install dependencies with uv (recommended)
