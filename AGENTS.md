@@ -26,6 +26,48 @@ lodestar_task_claim(task_id="F001", agent_id="YOUR_ID")
 7. VERIFY    lodestar_task_verify()        -> Unblock dependents
 ```
 
+### Visual Feedback with huesignal
+
+Agents can emit visual signals at key workflow events using [huesignal](https://github.com/anthropics/huesignal) for hardware status lights. This provides real-time feedback on agent activity.
+
+#### Setup
+
+1. **Optional Installation**: huesignal signals are graceful no-ops if not installed
+2. **Light Configuration**: Set `HUESIGNAL_LIGHT_NAME` environment variable to your light name (e.g., `HUESIGNAL_LIGHT_NAME=desk-light`)
+3. **Fallback**: If not configured, signals are silently skipped
+
+#### Workflow Events
+
+Add huesignal signals at these points in your agent workflow:
+
+**On task claim** (step 3):
+```bash
+# After lodestar_task_claim() succeeds
+huesignal pulse -c short -b 0.5 2>/dev/null || true
+```
+Short pulse indicates task acquisition.
+
+**On task complete** (step 6):
+```bash
+# After lodestar_task_done() succeeds
+huesignal pulse -c green -b 0.7 2>/dev/null || true
+```
+Green pulse confirms successful completion.
+
+**On blockers/errors** (any step):
+```bash
+# When blocked or encountering errors
+huesignal pulse -c red -b 1.0 --blink 3 2>/dev/null || true
+```
+Red blinking indicates blocker or error requiring attention.
+
+#### Implementation Notes
+
+- Signals are **non-blocking**: errors in huesignal commands don't interrupt workflow
+- Use `2>/dev/null || true` to suppress errors if huesignal is unavailable
+- Customize colors/brightness per workflow step as needed
+- Light names map to physical hardware configured in huesignal
+
 ---
 
 ## IMPORTANT: Task Creation Requires CLI
