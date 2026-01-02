@@ -160,8 +160,12 @@ EXPLAIN_TEXT = r"""
 │   huesignal samples list                                                      │
 │                                                                               │
 │ Show a sample template:                                                       │
-│   huesignal samples show github-actions                                       │
-│   huesignal samples show ci-pipeline --bridge-ip 192.168.1.100               │
+│   huesignal samples show coding-session-success                               │
+│   huesignal samples show lodestar-agent                                       │
+│   huesignal samples show pytest-conftest                                      │
+│                                                                               │
+│ All samples use cached config - no manual IPs needed!                        │
+│ Set HUESIGNAL_LIGHT_NAME environment variable for your default light.        │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌─ GLOBAL OPTIONS ─────────────────────────────────────────────────────────────┐

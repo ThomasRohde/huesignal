@@ -806,18 +806,17 @@ def samples_list() -> None:
 @samples_app.command(name="show")
 def samples_show(
     name: str = typer.Argument(..., help="Sample name to show"),
-    bridge_ip: str = typer.Option("192.168.1.100", "--bridge-ip", help="Bridge IP for template"),
-    light_id: str = typer.Option("1", "--light", help="Light ID for template"),
 ) -> None:
     """Show a sample automation template.
 
+    All samples use cached huesignal configuration (bridge IP, light name).
+    Set HUESIGNAL_LIGHT_NAME environment variable for default light.
+
     Args:
         name: Sample name to display
-        bridge_ip: Bridge IP address to use in template
-        light_id: Light ID to use in template
     """
     try:
-        sample = get_sample(name, bridge_ip=bridge_ip, light_id=light_id)
+        sample = get_sample(name)
         typer.echo(sample)
     except ValueError as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED)

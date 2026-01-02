@@ -132,36 +132,34 @@ async def restore_state(bridge: HueBridgeV2, snapshot: StateSnapshot, skip_light
 
         light_failed = False
 
-        # Restore on/off state
-        try:
-            await light.set_state(on=state.on)
-        except Exception as e:
-            logger.error(f"Failed to restore on/off state for light {light_id} ({state.light_name}): {e}")
-            light_failed = True
+        # Build state update dict to apply all changes at once
+        state_update = {}
 
-        # Restore brightness if light is on
+        # Set on/off state
+        state_update["on"] = state.on
+
+        # Add brightness if light should be on
         if state.on and state.brightness:
-            try:
-                await light.set_state(brightness=state.brightness)
-            except Exception as e:
-                logger.error(f"Failed to restore brightness for light {light_id} ({state.light_name}): {e}")
-                light_failed = True
+            state_update["brightness"] = state.brightness
 
-        # Restore color temperature if available
-        if state.color_temperature:
-            try:
-                await light.set_state(color_temperature=state.color_temperature)
-            except Exception as e:
-                logger.error(f"Failed to restore color temperature for light {light_id} ({state.light_name}): {e}")
-                light_failed = True
-
-        # Restore color (x, y) if available
+        # Add color (x, y) if available
         if state.color_xy:
-            try:
-                x, y = state.color_xy
-                await light.set_state(color=(x, y))
-            except Exception as e:
-                logger.error(f"Failed to restore color for light {light_id} ({state.light_name}): {e}")
+            x, y = state.color_xy
+            state_update["color_xy"] = (x, y)
+
+        # Apply all state changes at once
+        try:
+            await bridge.lights.set_state(light_id, **state_update)
+        except Exception as e:
+            # Check if this is a communication issue (light physically turned off)
+            error_msg = str(e).lower()
+            if "communication issues" in error_msg or "not reachable" in error_msg:
+                # Silently skip lights that are physically turned off
+                logger.debug(f"Skipping light {light_id} ({state.light_name}): physically turned off or unreachable")
+                continue
+            else:
+                # Log real errors
+                logger.error(f"Failed to restore state for light {light_id} ({state.light_name}): {e}")
                 light_failed = True
 
         if light_failed:

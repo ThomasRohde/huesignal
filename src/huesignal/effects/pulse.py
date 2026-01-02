@@ -50,12 +50,15 @@ class Pulse(Effect):
         for light_id in self.light_ids:
             light = self.bridge.lights.get(light_id)
             if light:
+                # Store original on/off state
+                was_on = light.on.on
                 # Store original brightness
-                brightness = light.dimming.brightness if light.dimming else 0
+                brightness = light.dimming.brightness if light.dimming else 100
                 original_states[light_id] = {
+                    "was_on": was_on,
                     "brightness": brightness,
                 }
-                logger.debug(f"Captured original brightness for {light_id}: {brightness}")
+                logger.debug(f"Captured original state for {light_id}: on={was_on}, brightness={brightness}")
                 # Store original color as XY tuple if available
                 if light.color:
                     xy = light.color.xy
@@ -64,11 +67,25 @@ class Pulse(Effect):
 
         # Perform pulse cycles
         for _ in range(self.count):
-            # Pulse out to target state
+            # Pulse DOWN first (go dim/off)
+            for light_id in self.light_ids:
+                try:
+                    await self.bridge.lights.set_state(
+                        light_id, on=True, brightness=1, transition_time=self.interval_ms
+                    )
+                except Exception:
+                    pass
+
+            # Wait for transition to complete
+            await asyncio.sleep((self.interval_ms / 1000.0) + 0.1)
+
+            # Pulse UP to target brightness/color
+            target_brightness = self.options.brightness if self.options.brightness else 254
             for light_id in self.light_ids:
                 await self._set_light_state(
                     light_id,
-                    brightness=self.options.brightness,
+                    on=True,
+                    brightness=target_brightness,
                     color=self.options.color,
                     transition_time=self.interval_ms,
                 )
@@ -82,16 +99,25 @@ class Pulse(Effect):
                     continue
                 original = original_states.get(light_id, {})
 
-                logger.debug(f"Restoring light {light_id} to brightness: {original.get('brightness')}")
+                logger.debug(f"Restoring light {light_id} to original state")
 
-                # Restore brightness only (color is handled separately if needed)
-                if "brightness" in original:
-                    try:
+                # Restore to original on/off state and brightness
+                try:
+                    was_on = original.get("was_on", True)
+                    brightness = original.get("brightness", 100)
+
+                    if was_on:
+                        # Light was on - restore brightness
                         await self.bridge.lights.set_state(
-                            light_id, on=True, brightness=original["brightness"], transition_time=self.interval_ms
+                            light_id, on=True, brightness=brightness, transition_time=self.interval_ms
                         )
-                        logger.debug(f"Restored brightness to: {original['brightness']}")
-                    except Exception as e:
+                    else:
+                        # Light was off - turn it back off
+                        await self.bridge.lights.set_state(light_id, on=False, transition_time=self.interval_ms)
+                    logger.debug(f"Restored to: on={was_on}, brightness={brightness}")
+                except Exception as e:
+                    # Only log if not a communication issue (physically off light)
+                    if "communication issues" not in str(e).lower():
                         logger.error(f"Failed to restore light state for {light_id}: {e}")
 
             # Wait for transition to complete plus a bit extra
