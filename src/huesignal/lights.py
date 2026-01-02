@@ -1,14 +1,12 @@
 """Lights management for Philips Hue."""
 
-import json
 import logging
-from typing import Optional
 
 from aiohue.v2 import HueBridgeV2
 
 from huesignal.auth import get_app_key
 from huesignal.cache import get_cache
-from huesignal.hue_client import HueClient, HueConnectionError
+from huesignal.hue_client import HueClient
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +49,7 @@ def _get_light_name_from_device(bridge: HueBridgeV2, light_id: str) -> str:
 
 async def list_lights(
     bridge_ip: str,
-    filter_name: Optional[str] = None,
+    filter_name: str | None = None,
     json_output: bool = False,
     use_cache: bool = True,
 ) -> dict:
@@ -150,7 +148,7 @@ async def show_light(bridge_ip: str, light_name: str, use_cache: bool = True) ->
         cached_lights = cache.get(cache_key)
 
         if cached_lights is not None:
-            logger.debug(f"Using cached light list for show_light")
+            logger.debug("Using cached light list for show_light")
             # Search for exact match first
             for light in cached_lights:
                 if light_name.lower() == light["name"].lower():

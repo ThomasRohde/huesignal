@@ -43,7 +43,7 @@ class Pulse(Effect):
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         # Capture original state for each light
         original_states: dict[str, dict] = {}
         for light_id in self.light_ids:
@@ -80,15 +80,15 @@ class Pulse(Effect):
                 if light_id not in self.bridge.lights:
                     continue
                 original = original_states.get(light_id, {})
-                
+
                 logger.debug(f"Restoring light {light_id} to brightness: {original.get('brightness')}")
 
                 # Restore brightness only (color is handled separately if needed)
                 if "brightness" in original:
                     try:
                         await self.bridge.lights.set_state(
-                            light_id, 
-                            on=True, 
+                            light_id,
+                            on=True,
                             brightness=original["brightness"],
                             transition_time=self.interval_ms
                         )

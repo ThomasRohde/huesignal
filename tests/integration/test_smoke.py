@@ -10,6 +10,7 @@ Only run against bridges you control.
 """
 
 import asyncio
+
 import pytest
 
 from huesignal.hue_client import HueClient, HueConnectionError
@@ -32,10 +33,10 @@ async def test_list_lights(bridge_ip, app_key):
     async with HueClient(bridge_ip, app_key) as client:
         bridge = client.bridge
         lights = list(bridge.lights.items())
-        
+
         # We should have at least some lights, but if not, that's okay
         assert isinstance(lights, list)
-        
+
         if lights:
             # Check light structure
             light_id, light = lights[0]
@@ -58,30 +59,30 @@ async def test_toggle_light_with_restoration(bridge_ip, app_key):
     async with HueClient(bridge_ip, app_key) as client:
         bridge = client.bridge
         lights = list(bridge.lights.items())
-        
+
         if not lights:
             pytest.skip("No lights available on bridge")
-        
+
         # Use first light
         light_id, light = lights[0]
-        
+
         # Capture original state
         original_state = {
             "on": light.on.on,
             "brightness": light.dimming.brightness if light.dimming else None,
         }
-        
+
         try:
             # Toggle off if on, or on if off
             new_state = not original_state["on"]
             await light.set_state(on=new_state)
-            
+
             # Give it a moment to update
             await asyncio.sleep(0.5)
-            
+
             # Verify state changed
             # (Note: state may not update immediately, so we just ensure no error)
-            
+
         finally:
             # Always restore original state
             try:

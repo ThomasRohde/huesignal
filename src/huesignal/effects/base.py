@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 from aiohue.v2 import HueBridgeV2
 
@@ -15,8 +14,8 @@ class EffectOptions:
     """Standard options for all effects."""
 
     duration_ms: int = 500  # Transition duration in milliseconds
-    brightness: Optional[int] = None  # 1-254
-    color: Optional[str] = None  # Color name or hex code
+    brightness: int | None = None  # 1-254
+    color: str | None = None  # Color name or hex code
     restore: bool = True  # Whether to restore state after effect
 
 
@@ -55,7 +54,7 @@ class Effect(ABC):
         self.bridge = bridge
         self.light_ids = light_ids
         self.options = options
-        self.initial_state: Optional[StateSnapshot] = None
+        self.initial_state: StateSnapshot | None = None
 
         # Validate options
         if self.options.brightness is not None:
@@ -97,9 +96,9 @@ class Effect(ABC):
         self,
         light_id: str,
         on: bool = True,
-        brightness: Optional[int] = None,
-        color: Optional[str] = None,
-        transition_time: Optional[int] = None,
+        brightness: int | None = None,
+        color: str | None = None,
+        transition_time: int | None = None,
     ) -> None:
         """Set light state with common parameters.
 
@@ -168,7 +167,7 @@ def register_effect(effect_class: type[Effect]) -> type[Effect]:
     return effect_class
 
 
-def get_effect_class(name: str) -> Optional[type[Effect]]:
+def get_effect_class(name: str) -> type[Effect] | None:
     """Get effect class by name.
 
     Args:

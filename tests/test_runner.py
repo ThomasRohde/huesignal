@@ -1,7 +1,7 @@
 """Unit tests for runner payload serialization."""
 
 import json
-import pytest
+
 from huesignal.runner import run_effect_sync
 
 

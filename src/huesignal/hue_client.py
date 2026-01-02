@@ -1,6 +1,5 @@
 """Async wrapper for aiohue library with connection and session management."""
 
-from typing import Optional
 
 import aiohttp
 from aiohue.v2 import HueBridgeV2
@@ -32,7 +31,7 @@ class HueClient:
         """
         self.bridge_ip = bridge_ip
         self.app_key = app_key
-        self._bridge: Optional[HueBridgeV2] = None
+        self._bridge: HueBridgeV2 | None = None
 
     @property
     def bridge(self) -> HueBridgeV2:

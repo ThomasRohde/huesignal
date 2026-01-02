@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class CacheManager:
             return {}
 
         try:
-            with open(self.cache_file, "r", encoding="utf-8") as f:
+            with open(self.cache_file, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             logger.debug(f"Failed to load cache: {e}")
@@ -61,7 +61,7 @@ class CacheManager:
         except OSError as e:
             logger.warning(f"Failed to save cache: {e}")
 
-    def get(self, key: str, default: Any = None) -> Optional[Any]:
+    def get(self, key: str, default: Any = None) -> Any | None:
         """Get value from cache if it exists and hasn't expired.
 
         Args:
@@ -91,7 +91,7 @@ class CacheManager:
         logger.debug(f"Cache hit: {key}")
         return entry.get("value", default)
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache with optional TTL.
 
         Args:
@@ -181,7 +181,7 @@ def get_cache() -> CacheManager:
     return _cache
 
 
-def get_default_bridge_ip() -> Optional[str]:
+def get_default_bridge_ip() -> str | None:
     """Get the cached default bridge IP address.
 
     Returns:

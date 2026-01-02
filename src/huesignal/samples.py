@@ -1,8 +1,7 @@
 """Automation templates for huesignal integration."""
 
-from typing import Dict
 
-SAMPLES: Dict[str, str] = {
+SAMPLES: dict[str, str] = {
     "powershell-exitcode": '''# PowerShell script that sets exit code based on huesignal success
 if (huesignal --bridge-ip {bridge_ip} effect apply disco --light {light_id}) {{
     exit 0

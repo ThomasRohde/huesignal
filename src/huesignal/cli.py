@@ -2,13 +2,14 @@
 
 import asyncio
 import sys
-from typing import Optional
 
 import typer
 
 from huesignal import __version__
-from huesignal.auth import AuthError, get_app_key, login as auth_login, store_app_key
+from huesignal.auth import AuthError, get_app_key, store_app_key
+from huesignal.auth import login as auth_login
 from huesignal.cache import get_cache, get_default_bridge_ip, set_default_bridge_ip
+from huesignal.cli_examples import EXPLAIN_TEXT
 from huesignal.discovery import discover_bridges, discover_bridges_mdns
 from huesignal.doctor import run_doctor
 from huesignal.effects import list_effects
@@ -16,7 +17,6 @@ from huesignal.hue_client import HueClient, HueConnectionError
 from huesignal.lights import list_lights, show_light
 from huesignal.logging_config import setup_logging
 from huesignal.samples import get_sample, list_samples
-from huesignal.cli_examples import EXPLAIN_TEXT
 
 app = typer.Typer(
     help="""Philips Hue notification system for visual feedback from AI agents and automation.
@@ -35,7 +35,7 @@ app = typer.Typer(
 )
 
 # Global options
-bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge")
+bridge_ip: str | None = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge")
 verbose: bool = typer.Option(False, "--verbose", help="Enable verbose output")
 quiet: bool = typer.Option(False, "--quiet", help="Suppress non-essential output")
 json_output: bool = typer.Option(False, "--json", help="Output in JSON format")
@@ -62,7 +62,7 @@ class GlobalOptions:
 
     def __init__(
         self,
-        bridge_ip: Optional[str] = None,
+        bridge_ip: str | None = None,
         verbose: bool = False,
         quiet: bool = False,
         json_output: bool = False,
@@ -78,7 +78,7 @@ class GlobalOptions:
 
 
 def get_bridge_ip(
-    provided_ip: Optional[str] = None,
+    provided_ip: str | None = None,
     quiet: bool = False,
 ) -> str:
     """Get bridge IP, checking cache before discovery.
@@ -136,7 +136,7 @@ def main(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", callback=version_callback, is_eager=True, help="Show version and exit"),
     explain: bool = typer.Option(False, "--explain", callback=explain_callback, is_eager=True, help="Show comprehensive usage examples and patterns for coding agents"),
-    bridge_ip: Optional[str] = bridge_ip,
+    bridge_ip: str | None = bridge_ip,
     verbose: bool = verbose,
     quiet: bool = quiet,
     json: bool = json_output,
@@ -215,7 +215,7 @@ Useful when bridge IP changes or experiencing connectivity issues.""")
 
 @auth_app.command()
 def login(
-    bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge (auto-discovered if omitted)"),
+    bridge_ip: str | None = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge (auto-discovered if omitted)"),
     print_key: bool = typer.Option(False, "--print", help="Print the app key to stdout instead of storing in credential manager"),
     timeout: int = typer.Option(30, "--timeout", help="Seconds to wait for link button press (default: 30)"),
 ) -> None:
@@ -299,7 +299,7 @@ def login(
 @lights_app.command(name="list")
 def list_cmd(
     ctx: typer.Context,
-    filter_name: Optional[str] = typer.Option(None, "--filter", "-f", help="Filter lights by name substring (case-insensitive)"),
+    filter_name: str | None = typer.Option(None, "--filter", "-f", help="Filter lights by name substring (case-insensitive)"),
 ) -> None:
     """List all lights available on your Hue bridge.
 
@@ -409,7 +409,7 @@ def list_cmd(
 def lights_on_cmd(
     ctx: typer.Context,
     light: str = typer.Argument(..., help="Light name to turn on"),
-    brightness: Optional[float] = typer.Option(None, "--brightness", "-b", help="Brightness (0-100)"),
+    brightness: float | None = typer.Option(None, "--brightness", "-b", help="Brightness (0-100)"),
 ) -> None:
     """Turn on a light.
 
@@ -572,9 +572,9 @@ def effect_list() -> None:
 def apply(
     ctx: typer.Context,
     effect_name: str = typer.Argument(..., help="Effect name: pulse, breathe, blink, or rainbow (see 'effect list')"),
-    light: Optional[str] = typer.Option(None, "--light", "-l", help="Target light name (omit to apply to ALL lights)"),
-    brightness: Optional[int] = typer.Option(None, "--brightness", "-b", help="Brightness: 0-100 (%), 0.0-1.0 (decimal), or 1-254 (raw)"),
-    color: Optional[str] = typer.Option(None, "--color", "-c", help="Color: name (red, green, blue, etc.) or hex (#FF0000)"),
+    light: str | None = typer.Option(None, "--light", "-l", help="Target light name (omit to apply to ALL lights)"),
+    brightness: int | None = typer.Option(None, "--brightness", "-b", help="Brightness: 0-100 (%), 0.0-1.0 (decimal), or 1-254 (raw)"),
+    color: str | None = typer.Option(None, "--color", "-c", help="Color: name (red, green, blue, etc.) or hex (#FF0000)"),
     duration: int = typer.Option(1000, "--duration", "-d", help="Effect duration in milliseconds (default: 1000)"),
     count: int = typer.Option(1, "--count", help="Number of cycles/repeats for pulse/blink effects (default: 1)"),
     no_restore: bool = typer.Option(False, "--no-restore", help="Don't restore original light state after effect (leaves light in effect's final state)"),
@@ -744,7 +744,7 @@ def samples_show(
 
 @app.command()
 def doctor(
-    bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="Bridge IP to diagnose (auto-discovered if omitted)"),
+    bridge_ip: str | None = typer.Option(None, "--bridge-ip", help="Bridge IP to diagnose (auto-discovered if omitted)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed diagnostic information"),
 ) -> None:
     """Run comprehensive diagnostic checks for huesignal setup.
@@ -819,8 +819,6 @@ def info() -> None:
 
     Displays cache location and statistics about cached data.
     """
-    import json
-    from pathlib import Path
 
     cache = get_cache()
     cache_file = cache.cache_file

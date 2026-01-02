@@ -1,15 +1,16 @@
 """Unit tests for light name resolver."""
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from huesignal.resolver import (
-    resolve_light,
-    resolve_lights,
-    parse_light_argument,
     AmbiguousLightError,
     LightNotFoundError,
     ResolvedLight,
+    parse_light_argument,
+    resolve_light,
+    resolve_lights,
 )
 
 

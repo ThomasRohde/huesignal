@@ -2,7 +2,6 @@
 
 import logging
 import sys
-from typing import Optional
 
 # Logger for the application
 logger = logging.getLogger("huesignal")

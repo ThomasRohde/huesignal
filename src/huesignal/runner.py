@@ -4,13 +4,12 @@ import json
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 def run_detached(
     effect_name: str,
-    parameters: Dict[str, Any],
+    parameters: dict[str, Any],
     detach: bool = True,
 ) -> int:
     """
@@ -68,7 +67,7 @@ def run_detached(
         return 1
 
 
-def run_effect_sync(effect_name: str, parameters: Dict[str, Any]) -> int:
+def run_effect_sync(effect_name: str, parameters: dict[str, Any]) -> int:
     """
     Run an effect synchronously (blocking).
 

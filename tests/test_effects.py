@@ -1,7 +1,7 @@
 """Unit tests for effects validation and serialization."""
 
+
 import pytest
-from unittest.mock import MagicMock
 
 from huesignal.effects.base import (
     EffectOptions,

@@ -1,11 +1,10 @@
 """Light state capture and restoration functionality."""
 
 import json
-from dataclasses import asdict, dataclass
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any
 
 from aiohue.v2 import HueBridgeV2
-from aiohue.v2.models.light import Light
 
 
 @dataclass
@@ -16,10 +15,10 @@ class LightState:
     light_name: str
     on: bool
     brightness: int
-    color_temperature: Optional[int] = None
-    color_xy: Optional[tuple] = None
+    color_temperature: int | None = None
+    color_xy: tuple | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return {
             "light_id": self.light_id,
@@ -31,7 +30,7 @@ class LightState:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LightState":
+    def from_dict(cls, data: dict[str, Any]) -> "LightState":
         """Create from dict."""
         return cls(**data)
 
@@ -40,7 +39,7 @@ class LightState:
 class StateSnapshot:
     """Snapshot of all light states."""
 
-    lights: Dict[str, LightState]
+    lights: dict[str, LightState]
 
     def to_json(self) -> str:
         """Serialize to JSON string."""
@@ -81,7 +80,7 @@ async def capture_state(bridge: HueBridgeV2) -> StateSnapshot:
     Returns:
         StateSnapshot containing all light states
     """
-    lights: Dict[str, LightState] = {}
+    lights: dict[str, LightState] = {}
 
     # Get all lights from bridge
     for light in bridge.lights.items:
@@ -111,7 +110,7 @@ async def capture_state(bridge: HueBridgeV2) -> StateSnapshot:
 
 
 async def restore_state(
-    bridge: HueBridgeV2, snapshot: StateSnapshot, skip_lights: Optional[list] = None
+    bridge: HueBridgeV2, snapshot: StateSnapshot, skip_lights: list | None = None
 ) -> None:
     """Restore lights to captured state.
 

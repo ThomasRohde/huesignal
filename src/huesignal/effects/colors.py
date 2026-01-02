@@ -1,7 +1,6 @@
 """Color parsing and conversion utilities for effects."""
 
 import re
-from typing import Optional, Tuple
 
 # Standard CSS/X11 color names mapped to RGB
 COLOR_NAMES = {
@@ -22,7 +21,7 @@ COLOR_NAMES = {
 }
 
 
-def parse_color(color_str: str) -> Tuple[int, int, int]:
+def parse_color(color_str: str) -> tuple[int, int, int]:
     """Parse color string to RGB tuple.
 
     Supports:
@@ -63,7 +62,7 @@ def parse_color(color_str: str) -> Tuple[int, int, int]:
     return (r, g, b)
 
 
-def rgb_to_xy(r: int, g: int, b: int) -> Tuple[float, float]:
+def rgb_to_xy(r: int, g: int, b: int) -> tuple[float, float]:
     """Convert RGB to Philips Hue xy color space.
 
     Args:

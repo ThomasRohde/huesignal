@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from typing import Optional
 
 import httpx
 from zeroconf import ServiceBrowser, Zeroconf
@@ -48,7 +47,7 @@ async def discover_bridges(use_cache: bool = True) -> list[dict[str, str]]:
                 logger.debug(f"Cached bridge discovery result: {len(bridges)} bridge(s)")
 
             return bridges
-    except (httpx.RequestError, httpx.HTTPError, asyncio.TimeoutError):
+    except (TimeoutError, httpx.RequestError, httpx.HTTPError):
         # No internet or endpoint unavailable - return empty list
         return []
     except Exception:

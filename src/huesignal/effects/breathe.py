@@ -2,7 +2,6 @@
 
 import asyncio
 import time
-from typing import Optional
 
 from huesignal.effects.base import Effect, EffectOptions, register_effect
 

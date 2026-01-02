@@ -1,7 +1,5 @@
 """Diagnostic checks for huesignal."""
 
-import asyncio
-from typing import Optional
 
 from huesignal.auth import get_app_key
 from huesignal.discovery import discover_bridges, discover_bridges_mdns
@@ -43,7 +41,7 @@ class DoctorStatus:
         return "\n".join(lines)
 
 
-async def run_doctor(bridge_ip: Optional[str] = None, verbose: bool = False) -> DoctorStatus:
+async def run_doctor(bridge_ip: str | None = None, verbose: bool = False) -> DoctorStatus:
     """
     Run diagnostic checks on the huesignal setup.
 

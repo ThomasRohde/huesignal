@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-from typing import Optional
 
 import keyring
 
@@ -14,7 +13,7 @@ class AuthError(Exception):
     """Raised when authentication fails."""
 
 
-def get_app_key() -> Optional[str]:
+def get_app_key() -> str | None:
     """
     Get the app key from environment variable or keyring.
 

@@ -1,6 +1,6 @@
 """Comprehensive CLI examples for coding agents and users."""
 
-EXPLAIN_TEXT = """
+EXPLAIN_TEXT = r"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                        huesignal - Usage Examples                            ║
 ║                  Complete Guide for Coding Agents & Automation               ║

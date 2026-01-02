@@ -1,7 +1,6 @@
 """Light name resolver with disambiguation for command-line selection."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from aiohue.v2 import HueBridgeV2
 
@@ -9,7 +8,7 @@ from aiohue.v2 import HueBridgeV2
 class AmbiguousLightError(Exception):
     """Raised when light name matches multiple lights."""
 
-    def __init__(self, name: str, candidates: List[tuple]):
+    def __init__(self, name: str, candidates: list[tuple]):
         self.name = name
         self.candidates = candidates
         msg = f"Ambiguous light name '{name}' matches multiple lights:\n"
@@ -60,8 +59,8 @@ def _get_light_name_from_device(bridge: HueBridgeV2, light_id: str) -> str:
 
 async def resolve_light(
     bridge: HueBridgeV2,
-    light_name: Optional[str] = None,
-    light_id: Optional[str] = None,
+    light_name: str | None = None,
+    light_id: str | None = None,
 ) -> ResolvedLight:
     """Resolve a single light by name or ID.
 
@@ -88,7 +87,7 @@ async def resolve_light(
 
     # If light_name is provided, match it
     if light_name:
-        matches: List[tuple] = []
+        matches: list[tuple] = []
         light_name_lower = light_name.lower()
 
         # Build light ID to name mapping from devices
@@ -116,9 +115,9 @@ async def resolve_light(
 
 async def resolve_lights(
     bridge: HueBridgeV2,
-    light_names: Optional[List[str]] = None,
-    light_ids: Optional[List[str]] = None,
-) -> List[ResolvedLight]:
+    light_names: list[str] | None = None,
+    light_ids: list[str] | None = None,
+) -> list[ResolvedLight]:
     """Resolve multiple lights by names or IDs.
 
     Args:
@@ -133,7 +132,7 @@ async def resolve_lights(
         LightNotFoundError: If any light not found
         AmbiguousLightError: If any name matches multiple lights
     """
-    resolved: List[ResolvedLight] = []
+    resolved: list[ResolvedLight] = []
 
     # If light_ids provided, use them
     if light_ids:
@@ -159,7 +158,7 @@ async def resolve_lights(
     return resolved
 
 
-def parse_light_argument(arg: str) -> List[str]:
+def parse_light_argument(arg: str) -> list[str]:
     """Parse light argument which may be comma-separated.
 
     Args:
