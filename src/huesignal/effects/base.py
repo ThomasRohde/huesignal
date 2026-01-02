@@ -19,6 +19,44 @@ class EffectOptions:
     restore: bool = True  # Whether to restore state after effect
 
 
+def normalize_brightness(value: float | int) -> int:
+    """Normalize brightness value to 1-254 range.
+
+    Accepts:
+      - 0.0-1.0 (decimal) -> converts to 1-254
+      - 0-100 (percentage) -> converts to 1-254
+      - 1-254 (raw API values) -> passes through
+
+    Args:
+        value: Brightness value to normalize
+
+    Returns:
+        Normalized brightness in range 1-254
+
+    Raises:
+        ValueError: If brightness is invalid or out of range
+    """
+    if isinstance(value, float):
+        # Handle decimal notation (0.0-1.0)
+        if 0.0 <= value <= 1.0:
+            return max(1, int(value * 254))
+        # Handle percentage as float (e.g., 75.5)
+        elif 0.0 <= value <= 100.0:
+            return max(1, int((value / 100.0) * 254))
+        else:
+            raise ValueError(f"Float brightness must be 0.0-1.0 or 0.0-100.0, got {value}")
+    else:
+        # Handle integer values
+        if 0 <= value <= 100:
+            # Treat as percentage
+            return max(1, int((value / 100.0) * 254))
+        elif 1 <= value <= 254:
+            # Treat as raw API value
+            return value
+        else:
+            raise ValueError(f"Brightness must be 0-100 (%), 0.0-1.0 (decimal), or 1-254 (raw), got {value}")
+
+
 def validate_brightness(value: int) -> None:
     """Validate brightness value.
 
@@ -60,13 +98,16 @@ class Effect(ABC):
         if self.options.brightness is not None:
             validate_brightness(self.options.brightness)
 
-    async def apply(self) -> None:
+    async def apply(self) -> list[str]:
         """Apply the effect to the lights.
 
         This is the main entry point that handles:
         1. Capturing initial state if restore is enabled
         2. Applying the effect
         3. Optionally restoring state after effect completes
+
+        Returns:
+            List of light IDs that failed to restore (empty if no failures or restore disabled)
         """
         # Capture initial state if restore is enabled
         if self.options.restore:
@@ -82,7 +123,10 @@ class Effect(ABC):
             if self.options.restore and self.initial_state:
                 from huesignal.state import restore_state
 
-                await restore_state(self.bridge, self.initial_state)
+                failed_lights = await restore_state(self.bridge, self.initial_state)
+                return failed_lights
+
+        return []
 
     @abstractmethod
     async def _apply_effect(self) -> None:

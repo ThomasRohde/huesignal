@@ -534,22 +534,32 @@ def lights_off_cmd(
 @lights_app.command(name="show")
 def show_light_cmd(
     ctx: typer.Context,
-    light_name: str = typer.Argument(..., help="Name of the light to show"),
+    light_name: str = typer.Argument(None, help="Name of the light to show"),
+    light_opt: str | None = typer.Option(
+        None, "--light", "-l", help="Name of the light to show (alternative to positional arg)"
+    ),
 ) -> None:
     """Show detailed information about a specific light.
 
     Args:
-        light_name: Name of the light to display
+        light_name: Name of the light to display (positional)
+        light_opt: Name of the light to display (--light/-l option)
     """
     # Get global options from context
     opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    # Determine which light name to use
+    effective_light_name = light_opt or light_name
+    if not effective_light_name:
+        typer.secho("Error: Light name is required (provide as argument or use --light/-l)", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
     # Get bridge IP (with caching)
     bridge_ip = get_bridge_ip(opts.bridge_ip, opts.quiet)
 
     # Fetch light details
     try:
-        light_info = asyncio.run(show_light(bridge_ip, light_name))
+        light_info = asyncio.run(show_light(bridge_ip, effective_light_name))
 
         if opts.json_output:
             # Output as JSON
@@ -558,15 +568,15 @@ def show_light_cmd(
             typer.echo(json.dumps(light_info, indent=2))
         else:
             # Output as formatted details
-            typer.echo(f"\nLight: {light_info['name']}")
-            typer.echo(f"ID: {light_info['id']}")
-            typer.echo(f"Type: {light_info['type']}")
-            typer.echo(f"Model: {light_info['model']}")
-            typer.echo(f"Status: {'On' if light_info['on'] else 'Off'}")
-            typer.echo(f"Reachable: {'Yes' if light_info['reachable'] else 'No'}")
-            typer.echo(f"Brightness: {light_info['brightness']}")
-            typer.echo(f"Color Support: {'Yes' if light_info['color_support'] else 'No'}")
-            typer.echo(f"Dim Support: {'Yes' if light_info['dim_support'] else 'No'}\n")
+            typer.echo(f"\nLight: {light_info.get('name', 'Unknown')}")
+            typer.echo(f"ID: {light_info.get('id', 'Unknown')}")
+            typer.echo(f"Type: {light_info.get('type', 'Unknown')}")
+            typer.echo(f"Model: {light_info.get('model', 'Unknown')}")
+            typer.echo(f"Status: {'On' if light_info.get('on', False) else 'Off'}")
+            typer.echo(f"Reachable: {'Yes' if light_info.get('reachable', False) else 'No'}")
+            typer.echo(f"Brightness: {light_info.get('brightness', 'N/A')}")
+            typer.echo(f"Color Support: {'Yes' if light_info.get('color_support', False) else 'No'}")
+            typer.echo(f"Dim Support: {'Yes' if light_info.get('dim_support', False) else 'No'}\n")
 
     except ValueError as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED)
@@ -596,8 +606,13 @@ def effect_list() -> None:
 def apply(
     ctx: typer.Context,
     effect_name: str = typer.Argument(..., help="Effect name: pulse, breathe, blink, or rainbow (see 'effect list')"),
-    light: str | None = typer.Option(None, "--light", "-l", help="Target light name (omit to apply to ALL lights)"),
-    brightness: int | None = typer.Option(
+    light: str | None = typer.Option(
+        None,
+        "--light",
+        "-l",
+        help="Target light name (omit to apply to ALL lights, or set HUESIGNAL_LIGHT_NAME env var)",
+    ),
+    brightness: float | None = typer.Option(
         None, "--brightness", "-b", help="Brightness: 0-100 (%), 0.0-1.0 (decimal), or 1-254 (raw)"
     ),
     color: str | None = typer.Option(
@@ -637,6 +652,10 @@ def apply(
       Shorter = faster, longer = smoother/slower.
       Typical: 500-3000ms
 
+    Default Light:
+      Set HUESIGNAL_LIGHT_NAME environment variable to target a specific light
+      by default when --light is omitted. Without this, effects apply to all lights.
+
     Examples:
       # Single green pulse (task complete signal)
       huesignal effect apply pulse -l desk-light -c green -b 0.7
@@ -656,6 +675,10 @@ def apply(
       # Apply to ALL lights (omit -l flag)
       huesignal effect apply pulse -c green -b 0.8
 
+      # Use default light from environment
+      $env:HUESIGNAL_LIGHT_NAME="desk-light"
+      huesignal effect apply pulse -c green -b 0.7
+
       # Don't restore state (leave light in effect color)
       huesignal effect apply pulse -l desk-light -c red --no-restore
 
@@ -670,11 +693,21 @@ def apply(
 
     Tip: Wrap commands in '2>/dev/null || true' for graceful failures in scripts.
     """
+    import os
+
     from huesignal.effects import EffectOptions, get_effect_class
     from huesignal.resolver import resolve_lights
 
     # Get global options from context
     opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    # Check for default light name in environment if --light not provided
+    if light is None:
+        default_light = os.environ.get("HUESIGNAL_LIGHT_NAME")
+        if default_light:
+            light = default_light
+            if not opts.quiet:
+                typer.echo(f"Using default light from HUESIGNAL_LIGHT_NAME: {light}")
 
     # Get bridge IP (with caching)
     bridge_ip = get_bridge_ip(opts.bridge_ip, opts.quiet)
@@ -715,12 +748,13 @@ def apply(
                 restore=not no_restore,
             )
 
-            # Validate brightness if provided
+            # Normalize and validate brightness if provided
             if brightness is not None:
-                from huesignal.effects import validate_brightness
+                from huesignal.effects import normalize_brightness
 
                 try:
-                    validate_brightness(brightness)
+                    normalized_brightness = normalize_brightness(brightness)
+                    effect_options.brightness = normalized_brightness
                 except ValueError as e:
                     typer.secho(f"Error: {e}", fg=typer.colors.RED)
                     raise typer.Exit(1)
@@ -731,13 +765,28 @@ def apply(
             else:
                 effect = effect_class(client.bridge, light_ids, effect_options)
 
-            await effect.apply()
+            failed_lights = await effect.apply()
 
             if not opts.quiet:
-                typer.secho("Effect applied successfully!", fg=typer.colors.GREEN)
+                if failed_lights:
+                    # Partial success - some lights failed to restore
+                    typer.secho(
+                        f"Effect applied with warnings: {len(failed_lights)} light(s) failed to restore.",
+                        fg=typer.colors.YELLOW,
+                    )
+                    typer.echo(f"Failed light IDs: {', '.join(failed_lights)}")
+                    # Non-zero exit code for partial failures
+                    return 2
+                else:
+                    typer.secho("Effect applied successfully!", fg=typer.colors.GREEN)
+            elif failed_lights:
+                # Quiet mode but still need to signal partial failure
+                return 2
 
     try:
-        asyncio.run(run_effect())
+        exit_code = asyncio.run(run_effect())
+        if exit_code and exit_code != 0:
+            raise typer.Exit(exit_code)
     except Exception as e:
         if opts.trace:
             raise

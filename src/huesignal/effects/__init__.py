@@ -5,6 +5,7 @@ from huesignal.effects.base import (
     EffectOptions,
     get_effect_class,
     list_effects,
+    normalize_brightness,
     register_effect,
     validate_brightness,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "EffectOptions",
     "get_effect_class",
     "list_effects",
+    "normalize_brightness",
     "register_effect",
     "validate_brightness",
     "parse_color",

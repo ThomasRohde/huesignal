@@ -102,6 +102,8 @@ async def list_lights(
                 "color_support": bool(light.supports_color) if hasattr(light, "supports_color") else False,
                 "dim_support": bool(light.supports_dimming) if hasattr(light, "supports_dimming") else False,
                 "brightness": light.brightness if hasattr(light, "brightness") else None,
+                "type": getattr(light, "type", "Unknown"),
+                "model": light.owner.rid if hasattr(light, "owner") else "Unknown",
             }
             all_lights.append(light_info)
 

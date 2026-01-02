@@ -103,15 +103,22 @@ async def capture_state(bridge: HueBridgeV2) -> StateSnapshot:
     return StateSnapshot(lights=lights)
 
 
-async def restore_state(bridge: HueBridgeV2, snapshot: StateSnapshot, skip_lights: list | None = None) -> None:
+async def restore_state(bridge: HueBridgeV2, snapshot: StateSnapshot, skip_lights: list | None = None) -> list[str]:
     """Restore lights to captured state.
 
     Args:
         bridge: HueBridgeV2 instance
         snapshot: StateSnapshot to restore to
         skip_lights: Optional list of light IDs to skip restoration
+
+    Returns:
+        List of light IDs that failed to restore
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
     skip_lights = skip_lights or []
+    failed_lights = []
 
     for light_id, state in snapshot.lights.items():
         # Skip if in skip list
@@ -123,31 +130,41 @@ async def restore_state(bridge: HueBridgeV2, snapshot: StateSnapshot, skip_light
         if not light:
             continue
 
+        light_failed = False
+
         # Restore on/off state
         try:
             await light.set_state(on=state.on)
-        except Exception:
-            # Ignore errors for individual lights
-            pass
+        except Exception as e:
+            logger.error(f"Failed to restore on/off state for light {light_id} ({state.light_name}): {e}")
+            light_failed = True
 
         # Restore brightness if light is on
         if state.on and state.brightness:
             try:
                 await light.set_state(brightness=state.brightness)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to restore brightness for light {light_id} ({state.light_name}): {e}")
+                light_failed = True
 
         # Restore color temperature if available
         if state.color_temperature:
             try:
                 await light.set_state(color_temperature=state.color_temperature)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to restore color temperature for light {light_id} ({state.light_name}): {e}")
+                light_failed = True
 
         # Restore color (x, y) if available
         if state.color_xy:
             try:
                 x, y = state.color_xy
                 await light.set_state(color=(x, y))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to restore color for light {light_id} ({state.light_name}): {e}")
+                light_failed = True
+
+        if light_failed:
+            failed_lights.append(light_id)
+
+    return failed_lights

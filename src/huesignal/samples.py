@@ -2,7 +2,7 @@
 
 SAMPLES: dict[str, str] = {
     "powershell-exitcode": """# PowerShell script that sets exit code based on huesignal success
-if (huesignal --bridge-ip {bridge_ip} effect apply disco --light {light_id}) {{
+if (huesignal --bridge-ip {bridge_ip} effect apply pulse --light {light_id} -c green -b 0.7) {{
     exit 0
 }} else {{
     exit 1
@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 result = subprocess.run(
-    ["huesignal", "--bridge-ip", "{bridge_ip}", "effect", "apply", "disco", "--light", "{light_id}"],
+    ["huesignal", "--bridge-ip", "{bridge_ip}", "effect", "apply", "pulse", "--light", "{light_id}", "-c", "green", "-b", "0.7"],
     capture_output=True
 )
 sys.exit(result.returncode)""",
@@ -21,7 +21,7 @@ sys.exit(result.returncode)""",
 - name: Notify via Philips Hue
   if: success()
   run: |
-    huesignal --bridge-ip {bridge_ip} effect apply success --light {light_id}
+    huesignal --bridge-ip {bridge_ip} effect apply pulse --light {light_id} -c green -b 0.7
   env:
     HUE_APP_KEY: ${{{{ secrets.HUE_APP_KEY }}}}""",
     "generic-agent-wrapper": """#!/bin/bash
@@ -30,7 +30,7 @@ BRIDGE_IP="{bridge_ip}"
 LIGHT_ID="{light_id}"
 
 # Signal task start
-huesignal --bridge-ip "$BRIDGE_IP" effect apply working --light "$LIGHT_ID"
+huesignal --bridge-ip "$BRIDGE_IP" effect apply pulse --light "$LIGHT_ID" -c blue -b 0.5
 
 # Run the actual task
 "$@"
@@ -38,9 +38,9 @@ TASK_EXIT=$?
 
 # Signal task completion
 if [ $TASK_EXIT -eq 0 ]; then
-    huesignal --bridge-ip "$BRIDGE_IP" effect apply success --light "$LIGHT_ID"
+    huesignal --bridge-ip "$BRIDGE_IP" effect apply pulse --light "$LIGHT_ID" -c green -b 0.7
 else
-    huesignal --bridge-ip "$BRIDGE_IP" effect apply failure --light "$LIGHT_ID"
+    huesignal --bridge-ip "$BRIDGE_IP" effect apply blink --light "$LIGHT_ID" -c red --count 3 -b 1.0
 fi
 
 exit $TASK_EXIT""",
@@ -59,13 +59,13 @@ for /f "tokens=1-2 delims=/:" %%a in ('time /t') do (set mytime=%%a%%b)
 
 REM Morning effect (08:00 AM)
 if !mytime! geq 0800 if !mytime! lss 0900 (
-    huesignal --bridge-ip !BRIDGE_IP! effect apply wakeup --light !LIGHT_ID!
+    huesignal --bridge-ip !BRIDGE_IP! effect apply breathe --light !LIGHT_ID! -c yellow -d 2000
     exit /b 0
 )
 
 REM Evening effect (6:00 PM)
 if !mytime! geq 1800 if !mytime! lss 1900 (
-    huesignal --bridge-ip !BRIDGE_IP! effect apply evening --light !LIGHT_ID!
+    huesignal --bridge-ip !BRIDGE_IP! effect apply breathe --light !LIGHT_ID! -c orange -d 2000
     exit /b 0
 )
 
