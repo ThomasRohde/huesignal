@@ -1,0 +1,913 @@
+project:
+  name: huesignal
+  default_branch: main
+  conventions: {}
+tasks:
+  F001:
+    title: Scaffold uv-based Python project with pyproject.toml
+    description: 'WHAT: Initialize Python project structure using uv package manager
+      with pyproject.toml and src layout.
+
+      WHERE: pyproject.toml, src/huesignal/__init__.py, src/huesignal/__main__.py
+
+      WHY: Foundation for all other features (PRD #feature-packaging)
+
+      SCOPE: Only project structure and uv config. Do NOT implement CLI commands yet.
+
+      ACCEPT: 1) pyproject.toml with huesignal entry point 2) uv sync works 3) uv
+      run huesignal --help shows placeholder
+
+      REFS: Use uv as package manager per user request'
+    acceptance_criteria:
+    - pyproject.toml exists with [project] metadata and console script entry point
+    - src/huesignal package structure created
+    - uv sync succeeds without errors
+    - uv run huesignal --help runs (even if just placeholder)
+    depends_on: []
+    labels:
+    - foundation
+    - setup
+    locks:
+    - pyproject.toml
+    - src/huesignal/**
+    priority: 1
+    status: ready
+    created_at: '2026-01-02T13:41:31.128757+00:00'
+    updated_at: '2026-01-02T13:41:31.128760+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-packaging'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F002:
+    title: Scaffold Typer CLI with global options
+    description: 'WHAT: Create Typer app with command groups and global options.
+
+      WHERE: src/huesignal/cli.py, src/huesignal/__main__.py
+
+      WHY: CLI structure required for all commands (PRD #feature-cli-skeleton)
+
+      SCOPE: CLI structure only. Commands can return placeholder text. Do NOT implement
+      actual functionality.
+
+      ACCEPT: 1) huesignal --help shows groups 2) Global options work 3) Exit codes
+      correct
+
+      REFS: Typer app pattern'
+    acceptance_criteria:
+    - huesignal --help shows auth, lights, effect, samples command groups
+    - Global options --bridge-ip, --verbose, --quiet, --json exist
+    - Unknown commands return non-zero exit code
+    - --quiet suppresses non-essential output
+    depends_on:
+    - F001
+    labels:
+    - cli
+    locks:
+    - src/huesignal/cli.py
+    priority: 2
+    status: ready
+    created_at: '2026-01-02T13:41:40.231770+00:00'
+    updated_at: '2026-01-02T13:41:40.231774+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-cli-skeleton'
+        lines: null
+      - anchor: '#feature-cli-skeleton-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F003:
+    title: Add aiohue client wrapper and session lifecycle
+    description: 'WHAT: Create async wrapper for aiohue library with connection/session
+      management.
+
+      WHERE: src/huesignal/hue_client.py
+
+      WHY: Core bridge communication layer (PRD #feature-library-selection)
+
+      SCOPE: Client wrapper only. Do NOT implement discovery or auth yet.
+
+      ACCEPT: 1) HueClient class connects given IP+key 2) Session cleanup works 3)
+      Async context manager
+
+      REFS: aiohue library docs'
+    acceptance_criteria:
+    - HueClient class with async context manager
+    - Connects to bridge with IP and app key
+    - Session cleanup on exit
+    - Basic error handling for connection failures
+    depends_on:
+    - F001
+    labels:
+    - core
+    locks:
+    - src/huesignal/hue_client.py
+    priority: 2
+    status: ready
+    created_at: '2026-01-02T13:41:48.341490+00:00'
+    updated_at: '2026-01-02T13:41:48.341493+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-library-selection'
+        lines: null
+      - anchor: '#feature-library-selection-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F004:
+    title: Implement bridge discovery via meethue.com endpoint
+    description: 'WHAT: Implement primary bridge discovery using discovery.meethue.com
+      API.
+
+      WHERE: src/huesignal/discovery.py
+
+      WHY: Auto-discover bridge without manual IP (PRD #feature-bridge-discovery)
+
+      SCOPE: Only meethue.com discovery. mDNS fallback is separate task.
+
+      ACCEPT: 1) discover_bridges() returns list 2) Handles no internet gracefully
+      3) Returns bridge IPs
+
+      REFS: https://discovery.meethue.com/'
+    acceptance_criteria:
+    - discover_bridges_meethue() function works
+    - Returns list of bridge IPs/IDs
+    - Handles network errors gracefully
+    - Short timeout (1-2 seconds)
+    depends_on:
+    - F001
+    labels:
+    - discovery
+    locks:
+    - src/huesignal/discovery.py
+    priority: 3
+    status: ready
+    created_at: '2026-01-02T13:41:56.461973+00:00'
+    updated_at: '2026-01-02T13:41:56.461976+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-bridge-discovery'
+        lines: null
+      - anchor: '#feature-bridge-discovery-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F005:
+    title: Implement mDNS discovery fallback with zeroconf
+    description: 'WHAT: Add mDNS-based bridge discovery as fallback when meethue.com
+      fails.
+
+      WHERE: src/huesignal/discovery.py
+
+      WHY: Local discovery without internet (PRD #feature-bridge-discovery)
+
+      SCOPE: Only mDNS discovery. Integrate with existing discovery module.
+
+      ACCEPT: 1) discover_bridges_mdns() works 2) Uses _hue._tcp.local 3) Short timeout
+
+      REFS: zeroconf library'
+    acceptance_criteria:
+    - discover_bridges_mdns() function using zeroconf
+    - Discovers _hue._tcp.local services
+    - 1-2 second timeout
+    - Integrates with main discover_bridges() function
+    depends_on:
+    - F004
+    labels:
+    - discovery
+    locks:
+    - src/huesignal/discovery.py
+    priority: 4
+    status: ready
+    created_at: '2026-01-02T13:42:04.244221+00:00'
+    updated_at: '2026-01-02T13:42:04.244225+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-bridge-discovery'
+        lines: null
+      - anchor: '#feature-bridge-discovery-notes'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F006:
+    title: Implement auth login with keyring credential storage
+    description: 'WHAT: Implement auth login command with Windows Credential Manager
+      storage.
+
+      WHERE: src/huesignal/auth.py, src/huesignal/cli.py (auth group)
+
+      WHY: Secure credential persistence (PRD #feature-auth)
+
+      SCOPE: Login flow and keyring storage. Include --print flag and env var support.
+
+      ACCEPT: 1) auth login stores key 2) --print outputs key 3) HUESIGNAL_APP_KEY
+      env var works
+
+      REFS: keyring library, Hue pairing flow'
+    acceptance_criteria:
+    - huesignal auth login creates app key after link button press
+    - Credential stored in Windows Credential Manager via keyring
+    - --print outputs key to stdout instead of storing
+    - HUESIGNAL_APP_KEY env var takes precedence over keyring
+    - Clear error message if link button not pressed
+    depends_on:
+    - F002
+    - F003
+    - F004
+    labels:
+    - auth
+    locks:
+    - src/huesignal/auth.py
+    priority: 5
+    status: ready
+    created_at: '2026-01-02T13:42:15.339141+00:00'
+    updated_at: '2026-01-02T13:42:15.339144+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-auth'
+        lines: null
+      - anchor: '#feature-auth-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F007:
+    title: Implement lights list command with table and JSON output
+    description: 'WHAT: Implement lights list command showing light status in table/JSON
+      format.
+
+      WHERE: src/huesignal/lights.py, src/huesignal/cli.py (lights group)
+
+      WHY: Core light discovery feature (PRD #feature-list-lights)
+
+      SCOPE: List command only. Show command is separate.
+
+      ACCEPT: 1) lights list shows table 2) --json works 3) --filter works 4) Shows
+      name/ID/status
+
+      REFS: aiohue lights API'
+    acceptance_criteria:
+    - huesignal lights list prints table with name, ID, on/off, reachable, color/dim
+      support
+    - --json outputs valid JSON array
+    - --filter does case-insensitive substring match
+    - Command completes in under 2 seconds
+    depends_on:
+    - F003
+    - F006
+    labels:
+    - lights
+    locks:
+    - src/huesignal/lights.py
+    priority: 6
+    status: ready
+    created_at: '2026-01-02T13:42:24.405060+00:00'
+    updated_at: '2026-01-02T13:42:24.405063+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-list-lights'
+        lines: null
+      - anchor: '#feature-list-lights-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F008:
+    title: Implement lights show command for detailed light info
+    description: 'WHAT: Implement lights show command for detailed single light info.
+
+      WHERE: src/huesignal/lights.py
+
+      WHY: Detailed light inspection (PRD #feature-list-lights)
+
+      SCOPE: Show command only. Builds on lights list infrastructure.
+
+      ACCEPT: 1) lights show <name> works 2) Exits non-zero if not found 3) --json
+      works
+
+      REFS: Extend lights.py'
+    acceptance_criteria:
+    - huesignal lights show <name> shows detailed light info
+    - Exits non-zero if light name not found
+    - --json outputs valid JSON object
+    - Shows all available light properties
+    depends_on:
+    - F007
+    labels:
+    - lights
+    locks:
+    - src/huesignal/lights.py
+    priority: 7
+    status: ready
+    created_at: '2026-01-02T13:42:31.741876+00:00'
+    updated_at: '2026-01-02T13:42:31.741879+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-list-lights'
+        lines: null
+      - anchor: '#feature-list-lights-criteria'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F009:
+    title: Implement light name resolver with disambiguation
+    description: 'WHAT: Create name resolver for --light flag with case-insensitive
+      matching.
+
+      WHERE: src/huesignal/resolver.py
+
+      WHY: Consistent light selection across commands (PRD #feature-light-selection)
+
+      SCOPE: Resolver logic only. Include --dry-run and --light-id support.
+
+      ACCEPT: 1) Case-insensitive match 2) Ambiguous match errors 3) --dry-run works
+      4) --light-id fallback
+
+      REFS: Name matching logic'
+    acceptance_criteria:
+    - resolve_lights() matches names case-insensitively
+    - Ambiguous matches produce non-zero exit with candidates list
+    - --dry-run prints resolved IDs without executing
+    - --light-id works when name matching fails
+    - Supports --light (single) and --lights (comma-separated)
+    depends_on:
+    - F007
+    labels:
+    - lights
+    locks:
+    - src/huesignal/resolver.py
+    priority: 7
+    status: ready
+    created_at: '2026-01-02T13:42:40.975147+00:00'
+    updated_at: '2026-01-02T13:42:40.975156+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-light-selection'
+        lines: null
+      - anchor: '#feature-light-selection-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F010:
+    title: Implement effect framework with shared options
+    description: 'WHAT: Create effect command framework with standard flags and validation.
+
+      WHERE: src/huesignal/effects/__init__.py, src/huesignal/effects/base.py, src/huesignal/cli.py
+      (effect group)
+
+      WHY: Foundation for all effects (PRD #feature-effect-framework)
+
+      SCOPE: Framework only. Individual effects are separate tasks.
+
+      ACCEPT: 1) effect list works 2) Standard flags validated 3) Color name/hex parsing
+
+      REFS: Effect base class pattern'
+    acceptance_criteria:
+    - huesignal effect list prints available effects
+    - 'Standard flags: --duration-ms, --brightness 1-254, --color, --restore/--no-restore'
+    - Invalid brightness (0 or 999) returns non-zero with clear message
+    - 'Color name and #RRGGBB hex parsing works'
+    - Effect base class for consistent implementation
+    depends_on:
+    - F002
+    - F009
+    labels:
+    - effects
+    locks:
+    - src/huesignal/effects/**
+    priority: 8
+    status: ready
+    created_at: '2026-01-02T13:42:51.704170+00:00'
+    updated_at: '2026-01-02T13:42:51.704175+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-effect-framework'
+        lines: null
+      - anchor: '#feature-effect-framework-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F011:
+    title: Implement state capture and restore functionality
+    description: 'WHAT: Capture light state before effects and restore after.
+
+      WHERE: src/huesignal/state.py
+
+      WHY: Restore lights to original state after effects (PRD #feature-restore-state)
+
+      SCOPE: State capture/restore logic. Serialization for detached runner.
+
+      ACCEPT: 1) capture_state() works 2) restore_state() works 3) Serializable for
+      runner
+
+      REFS: Light state properties'
+    acceptance_criteria:
+    - capture_state() saves on/off, brightness, color info per light
+    - restore_state() returns lights to captured state
+    - State snapshot is JSON-serializable for detached runner
+    - --no-restore skips restoration
+    - State capture does not include secrets
+    depends_on:
+    - F003
+    labels:
+    - effects
+    locks:
+    - src/huesignal/state.py
+    priority: 8
+    status: ready
+    created_at: '2026-01-02T13:43:00.517559+00:00'
+    updated_at: '2026-01-02T13:43:00.517561+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-restore-state'
+        lines: null
+      - anchor: '#feature-restore-state-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F012:
+    title: Implement detached runner for fire-and-forget effects
+    description: 'WHAT: Create Windows detached process for time-based effects.
+
+      WHERE: src/huesignal/runner.py
+
+      WHY: CLI returns quickly while effects continue (PRD #feature-detach-runner)
+
+      SCOPE: Windows detached process spawning. Payload passing via temp file.
+
+      ACCEPT: 1) Parent returns quickly 2) Child runs effect 3) No console window
+      4) --no-detach works
+
+      REFS: subprocess.Popen with DETACHED_PROCESS'
+    acceptance_criteria:
+    - Parent process returns control to shell quickly
+    - Child process continues running effect
+    - No new console window opened
+    - --no-detach runs synchronously for debugging
+    - Payload passed via temp file, deleted after read
+    depends_on:
+    - F010
+    - F011
+    labels:
+    - effects
+    locks:
+    - src/huesignal/runner.py
+    priority: 9
+    status: ready
+    created_at: '2026-01-02T13:43:09.006529+00:00'
+    updated_at: '2026-01-02T13:43:09.006533+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-detach-runner'
+        lines: null
+      - anchor: '#feature-detach-runner-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F013:
+    title: Implement blink effect
+    description: 'WHAT: Implement blink effect with count and interval options.
+
+      WHERE: src/huesignal/effects/blink.py
+
+      WHY: Quick notification effect (PRD #feature-effect-blink)
+
+      SCOPE: Blink effect only. Use Hue alert API if available.
+
+      ACCEPT: 1) blink causes visible blink 2) --count works 3) --restore works 4)
+      Returns promptly
+
+      REFS: Hue alert feature'
+    acceptance_criteria:
+    - effect run blink --light <name> causes visible blink
+    - --count 3 triggers exactly 3 blinks
+    - --interval-ms controls blink speed (default 500)
+    - --restore returns light to original state
+    - Uses Hue alert API when available, fallback to on/off toggle
+    depends_on:
+    - F012
+    labels:
+    - effects
+    locks:
+    - src/huesignal/effects/blink.py
+    priority: 10
+    status: ready
+    created_at: '2026-01-02T13:43:18.592236+00:00'
+    updated_at: '2026-01-02T13:43:18.592239+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-effect-blink'
+        lines: null
+      - anchor: '#feature-effect-blink-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F014:
+    title: Implement pulse effect
+    description: 'WHAT: Implement pulse effect for brightness/color pulses.
+
+      WHERE: src/huesignal/effects/pulse.py
+
+      WHY: Success/failure notification (PRD #feature-effect-pulse)
+
+      SCOPE: Pulse effect only. Brightness and color support.
+
+      ACCEPT: 1) pulse changes brightness 2) --color works on color lights 3) --count
+      works 4) --restore works
+
+      REFS: Brightness animation'
+    acceptance_criteria:
+    - effect run pulse changes brightness perceptibly
+    - --color green visibly changes color during pulse (color lights)
+    - --count produces repeatable pulse count
+    - --restore returns light to original state
+    depends_on:
+    - F012
+    labels:
+    - effects
+    locks:
+    - src/huesignal/effects/pulse.py
+    priority: 10
+    status: ready
+    created_at: '2026-01-02T13:43:26.001383+00:00'
+    updated_at: '2026-01-02T13:43:26.001386+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-effect-pulse'
+        lines: null
+      - anchor: '#feature-effect-pulse-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F015:
+    title: Implement breathe effect
+    description: 'WHAT: Implement smooth breathing effect with rate limiting.
+
+      WHERE: src/huesignal/effects/breathe.py
+
+      WHY: Long-running job completion signal (PRD #feature-effect-breathe)
+
+      SCOPE: Breathe effect only. Rate-limited updates.
+
+      ACCEPT: 1) breathe runs for duration 2) Rate limiting works 3) --restore works
+      4) Fire-and-forget
+
+      REFS: Stepped brightness changes'
+    acceptance_criteria:
+    - "effect run breathe runs for approximately --duration-ms (\xB110%)"
+    - --period-ms controls breath cycle speed
+    - Per-step update rate does not exceed safe threshold
+    - --restore returns light to original state
+    - CLI returns promptly in fire-and-forget mode
+    depends_on:
+    - F012
+    labels:
+    - effects
+    locks:
+    - src/huesignal/effects/breathe.py
+    priority: 10
+    status: ready
+    created_at: '2026-01-02T13:43:34.285001+00:00'
+    updated_at: '2026-01-02T13:43:34.285004+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-effect-breathe'
+        lines: null
+      - anchor: '#feature-effect-breathe-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F016:
+    title: Implement rainbow effect
+    description: 'WHAT: Implement rainbow color cycle effect with graceful degradation.
+
+      WHERE: src/huesignal/effects/rainbow.py
+
+      WHY: Interesting alerts for deploys (PRD #feature-effect-rainbow)
+
+      SCOPE: Rainbow effect only. Degrade to brightness wave on non-color lights.
+
+      ACCEPT: 1) rainbow cycles colors 2) Degrades on non-color lights 3) --step-ms
+      works 4) --restore works
+
+      REFS: Hue color cycling'
+    acceptance_criteria:
+    - effect run rainbow cycles through multiple distinct colors
+    - On non-color lights, produces brightness-based alternative
+    - --step-ms affects perceptible speed of change
+    - --restore returns light to original state
+    - --duration-ms controls total effect duration
+    depends_on:
+    - F012
+    labels:
+    - effects
+    locks:
+    - src/huesignal/effects/rainbow.py
+    priority: 10
+    status: ready
+    created_at: '2026-01-02T13:43:42.694101+00:00'
+    updated_at: '2026-01-02T13:43:42.694104+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-effect-rainbow'
+        lines: null
+      - anchor: '#feature-effect-rainbow-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F017:
+    title: Implement samples commands with automation templates
+    description: 'WHAT: Implement samples list and show commands with 5+ templates.
+
+      WHERE: src/huesignal/samples.py, src/huesignal/cli.py (samples group)
+
+      WHY: Copy/paste automation patterns (PRD #feature-samples)
+
+      SCOPE: Samples command only. Templates for PowerShell, Python, GitHub Actions,
+      etc.
+
+      ACCEPT: 1) samples list shows 5+ samples 2) samples show <name> prints snippet
+      3) Placeholders work
+
+      REFS: Automation patterns'
+    acceptance_criteria:
+    - samples list outputs at least 5 sample names
+    - samples show github-actions prints valid YAML step snippet
+    - samples show powershell-exitcode shows failure/success mapping
+    - Placeholders can be overridden via --light, --bridge-ip flags
+    - 'Includes: powershell-exitcode, python-exitcode, github-actions, generic-agent-wrapper,
+      windows-task-scheduler'
+    depends_on:
+    - F002
+    labels:
+    - cli
+    locks:
+    - src/huesignal/samples.py
+    priority: 11
+    status: ready
+    created_at: '2026-01-02T13:43:52.195923+00:00'
+    updated_at: '2026-01-02T13:43:52.195925+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-samples'
+        lines: null
+      - anchor: '#feature-samples-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F018:
+    title: Implement doctor command and logging modes
+    description: 'WHAT: Implement doctor command and --verbose/--trace logging modes.
+
+      WHERE: src/huesignal/doctor.py, src/huesignal/logging_config.py
+
+      WHY: Debug connectivity and issues (PRD #feature-logging)
+
+      SCOPE: Doctor command and logging infrastructure.
+
+      ACCEPT: 1) doctor checks bridge/auth 2) --verbose works 3) --trace shows tracebacks
+      4) Logs to stderr
+
+      REFS: Diagnostic patterns'
+    acceptance_criteria:
+    - huesignal doctor exits 0 when bridge/auth functional, non-zero otherwise
+    - --verbose shows request/response summaries without secrets
+    - --trace includes Python traceback on unexpected errors
+    - Errors printed to stderr, not stdout
+    - 'Doctor checks: bridge reachable, credential present, basic API call works'
+    depends_on:
+    - F006
+    labels:
+    - cli
+    locks:
+    - src/huesignal/doctor.py
+    - src/huesignal/logging_config.py
+    priority: 11
+    status: ready
+    created_at: '2026-01-02T13:44:01.060212+00:00'
+    updated_at: '2026-01-02T13:44:01.060215+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-logging'
+        lines: null
+      - anchor: '#feature-logging-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F019:
+    title: Implement exit codes and machine-readable output
+    description: 'WHAT: Ensure consistent exit codes and --json output across commands.
+
+      WHERE: src/huesignal/errors.py, src/huesignal/cli.py
+
+      WHY: Enable scripting without fragile parsing (PRD #feature-exit-codes)
+
+      SCOPE: Exit code constants, error handling, --quiet and --timeout-ms.
+
+      ACCEPT: 1) Non-zero codes for errors 2) --json valid 3) --quiet works 4) --timeout-ms
+      works
+
+      REFS: Exit code patterns'
+    acceptance_criteria:
+    - 'Non-zero exit codes for: auth failure, no lights matched, ambiguous match,
+      bridge unreachable'
+    - --json outputs valid JSON with no extra stdout text
+    - --quiet suppresses tables and informational logs
+    - --timeout-ms controls bridge operation timeout
+    - Ambiguous light match returns specific code with candidates to stderr
+    depends_on:
+    - F002
+    labels:
+    - cli
+    locks:
+    - src/huesignal/errors.py
+    priority: 11
+    status: ready
+    created_at: '2026-01-02T13:44:09.961785+00:00'
+    updated_at: '2026-01-02T13:44:09.961788+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-exit-codes'
+        lines: null
+      - anchor: '#feature-exit-codes-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F020:
+    title: Add unit tests for core logic
+    description: 'WHAT: Create pytest test suite for name matching, validation, payload
+      serialization.
+
+      WHERE: tests/test_resolver.py, tests/test_effects.py, tests/test_runner.py
+
+      WHY: Confidence in core logic (PRD #feature-tests-unit)
+
+      SCOPE: Unit tests only. No hardware required.
+
+      ACCEPT: 1) pytest passes 2) Name resolution tests 3) Validation tests 4) Payload
+      round-trip tests
+
+      REFS: pytest patterns'
+    acceptance_criteria:
+    - pytest passes locally with no Hue hardware required
+    - 'Name resolution tests cover: exact, partial, ambiguous, not-found cases'
+    - Invalid parameter tests assert non-zero exit codes
+    - Payload tests ensure round-trip equality
+    - 'Test runner: pytest with CI-friendly defaults'
+    depends_on:
+    - F009
+    - F010
+    - F012
+    labels:
+    - tests
+    locks:
+    - tests/**
+    priority: 12
+    status: ready
+    created_at: '2026-01-02T13:44:20.355673+00:00'
+    updated_at: '2026-01-02T13:44:20.355676+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-tests-unit'
+        lines: null
+      - anchor: '#feature-tests-unit-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F021:
+    title: Add optional integration test suite
+    description: 'WHAT: Create opt-in integration tests gated by env vars.
+
+      WHERE: tests/integration/test_smoke.py
+
+      WHY: Hardware-backed validation (PRD #feature-tests-integration)
+
+      SCOPE: Integration tests only. Skipped by default.
+
+      ACCEPT: 1) Skipped without env vars 2) Smoke test works 3) State restored 4)
+      Safety docs
+
+      REFS: Integration test patterns'
+    acceptance_criteria:
+    - Running tests without env vars skips integration tests
+    - With HUESIGNAL_BRIDGE_IP and HUESIGNAL_APP_KEY, smoke test works
+    - Integration tests restore original state after running
+    - Documentation warns about physical side effects
+    depends_on:
+    - F020
+    labels:
+    - tests
+    locks:
+    - tests/integration/**
+    priority: 13
+    status: ready
+    created_at: '2026-01-02T13:44:28.313620+00:00'
+    updated_at: '2026-01-02T13:44:28.313623+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-tests-integration'
+        lines: null
+      - anchor: '#feature-tests-integration-requirements'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F022:
+    title: Write README with quickstart and installation
+    description: 'WHAT: Create README.md with installation, quickstart, and library
+      rationale.
+
+      WHERE: README.md
+
+      WHY: User onboarding (PRD #feature-packaging)
+
+      SCOPE: README only. Include uv install instructions.
+
+      ACCEPT: 1) 60-second quickstart 2) uv/pipx install docs 3) Library rationale
+      4) --version works
+
+      REFS: README patterns'
+    acceptance_criteria:
+    - README includes 60-second quickstart
+    - Installation docs for uv, pipx, and pip
+    - States chosen library (aiohue) and rationale
+    - huesignal --version prints semver and exits 0
+    depends_on:
+    - F001
+    labels:
+    - docs
+    locks:
+    - README.md
+    priority: 5
+    status: ready
+    created_at: '2026-01-02T13:44:36.399798+00:00'
+    updated_at: '2026-01-02T13:44:36.399801+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#feature-packaging'
+        lines: null
+      - anchor: '#feature-library-selection-criteria'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  F023:
+    title: Update AGENTS.md with huesignal integration for agent events
+    description: 'WHAT: Update AGENTS.md to instruct agents to use huesignal for task
+      events.
+
+      WHERE: AGENTS.md
+
+      WHY: Visual feedback when agents complete tasks or need attention
+
+      SCOPE: AGENTS.md update only. Add huesignal commands for key workflow events.
+
+      ACCEPT: 1) Agents signal on task claim 2) Agents signal on task complete 3)
+      Agents signal on blockers
+
+      REFS: Existing AGENTS.md workflow'
+    acceptance_criteria:
+    - AGENTS.md includes huesignal commands for task_claim (short pulse)
+    - AGENTS.md includes huesignal commands for task_complete (green pulse)
+    - AGENTS.md includes huesignal commands for blockers/errors (red blink)
+    - Documents light name configuration
+    - Instructions are optional/graceful if huesignal not installed
+    depends_on:
+    - F013
+    - F014
+    labels:
+    - docs
+    - agent-integration
+    locks:
+    - AGENTS.md
+    priority: 14
+    status: ready
+    created_at: '2026-01-02T13:44:46.486244+00:00'
+    updated_at: '2026-01-02T13:44:46.486247+00:00'
+    prd:
+      source: PRD.md
+      refs:
+      - anchor: '#users-use-cases'
+        lines: null
+      excerpt: null
+      prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
