@@ -168,16 +168,21 @@ Write-Success "Created tag $tagName"
 # Push to GitHub
 Write-Info "Pushing to GitHub..."
 Write-Warning "This will trigger the PyPI publish workflow via GitHub Actions trusted publisher"
+
+# Get current branch name
+$currentBranch = git branch --show-current
+Write-Info "Current branch: $currentBranch"
+
 Write-Host ""
 $confirmPush = Read-Host "Push now? (y/N)"
 if ($confirmPush -ne 'y' -and $confirmPush -ne 'Y') {
     Write-Warning "Changes committed and tagged locally, but not pushed"
     Write-Info "To push manually later, run:"
-    Write-Host "  git push origin main && git push origin $tagName"
+    Write-Host "  git push origin $currentBranch && git push origin $tagName"
     exit 0
 }
 
-git push origin main
+git push origin $currentBranch
 git push origin $tagName
 Write-Success "Pushed to GitHub"
 
