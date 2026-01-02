@@ -19,21 +19,48 @@ def mock_bridge():
     """Create a mock HueBridge with test lights."""
     bridge = MagicMock()
 
-    # Create mock lights
-    lights = {}
+    # Create mock lights and devices
     light_data = [
         ("1", "Desk Lamp"),
         ("2", "Bedroom Light"),
         ("3", "Living Room"),
     ]
 
+    # Set up lights with dict-like access and items property
+    lights_dict = {}
+    lights_items = []
+
     for light_id, light_name in light_data:
         light = MagicMock()
+        light.id = light_id
         light.metadata = MagicMock()
         light.metadata.name = light_name
-        lights[light_id] = light
+        lights_dict[light_id] = light
+        lights_items.append(light)
 
-    bridge.lights = lights
+    bridge.lights = MagicMock()
+    bridge.lights.get = lambda lid: lights_dict.get(lid)
+    bridge.lights.items = lights_items
+    bridge.lights.__getitem__ = lambda self, key: lights_dict[key]
+
+    # Set up devices that contain the lights
+    devices_items = []
+    for light_id, light_name in light_data:
+        device = MagicMock()
+        device.metadata = MagicMock()
+        device.metadata.name = light_name
+
+        service = MagicMock()
+        service.rtype = MagicMock()
+        service.rtype.value = "light"
+        service.rid = light_id
+
+        device.services = [service]
+        devices_items.append(device)
+
+    bridge.devices = MagicMock()
+    bridge.devices.items = devices_items
+
     return bridge
 
 
@@ -91,9 +118,21 @@ class TestResolveLight:
         """Test that AmbiguousLightError is raised for ambiguous names."""
         # Add duplicate light names
         light = MagicMock()
+        light.id = "4"
         light.metadata = MagicMock()
         light.metadata.name = "Desk Lamp"
-        mock_bridge.lights["4"] = light
+        mock_bridge.lights.items.append(light)
+
+        # Add corresponding device
+        device = MagicMock()
+        device.metadata = MagicMock()
+        device.metadata.name = "Desk Lamp"
+        service = MagicMock()
+        service.rtype = MagicMock()
+        service.rtype.value = "light"
+        service.rid = "4"
+        device.services = [service]
+        mock_bridge.devices.items.append(device)
 
         with pytest.raises(AmbiguousLightError) as exc_info:
             await resolve_light(mock_bridge, light_name="Desk Lamp")
