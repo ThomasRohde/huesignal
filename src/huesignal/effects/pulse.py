@@ -41,6 +41,9 @@ class Pulse(Effect):
         Pulses from current state to target brightness/color and back,
         repeated count times.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Capture original state for each light
         original_states: dict[str, dict] = {}
         for light_id in self.light_ids:
@@ -51,6 +54,7 @@ class Pulse(Effect):
                 original_states[light_id] = {
                     "brightness": brightness,
                 }
+                logger.debug(f"Captured original brightness for {light_id}: {brightness}")
                 # Store original color as XY tuple if available
                 if light.color:
                     xy = light.color.xy
@@ -68,31 +72,29 @@ class Pulse(Effect):
                     transition_time=self.interval_ms,
                 )
 
-            await asyncio.sleep(self.interval_ms / 1000.0)
+            # Wait for transition to complete plus a bit extra
+            await asyncio.sleep((self.interval_ms / 1000.0) + 0.1)
 
             # Pulse back to original state
             for light_id in self.light_ids:
-                light = self.bridge.lights.get(light_id)
-                if not light:
+                if light_id not in self.bridge.lights:
                     continue
                 original = original_states.get(light_id, {})
+                
+                logger.debug(f"Restoring light {light_id} to brightness: {original.get('brightness')}")
 
-                # Prepare state update for original brightness/color
-                state_update = {}
+                # Restore brightness only (color is handled separately if needed)
                 if "brightness" in original:
-                    state_update["brightness"] = original["brightness"]
-                if "color_xy" in original:
-                    x, y = original["color_xy"]
-                    state_update["color"] = (x, y)
+                    try:
+                        await self.bridge.lights.set_state(
+                            light_id, 
+                            on=True, 
+                            brightness=original["brightness"],
+                            transition_time=self.interval_ms
+                        )
+                        logger.debug(f"Restored brightness to: {original['brightness']}")
+                    except Exception as e:
+                        logger.error(f"Failed to restore light state for {light_id}: {e}")
 
-                # Apply transition time
-                state_update["transition_time"] = self.interval_ms
-
-                # Apply state update
-                try:
-                    await light.set_state(**state_update)
-                except Exception:
-                    # Ignore errors on individual lights
-                    pass
-
-            await asyncio.sleep(self.interval_ms / 1000.0)
+            # Wait for transition to complete plus a bit extra
+            await asyncio.sleep((self.interval_ms / 1000.0) + 0.1)

@@ -1,59 +1,65 @@
 """Blink effect implementation."""
 
 import asyncio
-from typing import Optional
 
-from huesignal.hue_client import HueClient
+from aiohue.v2 import HueBridgeV2
+
+from huesignal.effects.base import Effect, EffectOptions, register_effect
 
 
-async def blink(
-    client: HueClient,
-    light_ids: list,
-    count: int = 1,
-    interval_ms: int = 500,
-    restore: bool = False,
-) -> None:
-    """
-    Blink lights.
+@register_effect
+class Blink(Effect):
+    """Blink effect - turns lights on and off repeatedly."""
 
-    Args:
-        client: HueClient instance
-        light_ids: List of light IDs to blink
-        count: Number of blinks (default 1)
-        interval_ms: Interval between blinks in milliseconds (default 500)
-        restore: If True, restore original state after effect
-    """
-    interval_s = interval_ms / 1000.0
+    name = "blink"
+    description = "Blink lights on and off"
 
-    # Store original states if restore is enabled
-    original_states = {}
-    if restore:
-        for light_id in light_ids:
-            light = client.bridge.lights.get(light_id)
-            if light:
-                original_states[light_id] = {"on": light.is_on, "brightness": light.brightness}
+    def __init__(
+        self,
+        bridge: HueBridgeV2,
+        light_ids: list[str],
+        options: EffectOptions,
+        count: int = 3,
+        interval_ms: int = 500,
+    ):
+        """Initialize blink effect.
 
-    # Perform blinks
-    for _ in range(count):
-        # Turn off
-        for light_id in light_ids:
-            light = client.bridge.lights.get(light_id)
-            if light:
-                await light.set_state(on=False)
+        Args:
+            bridge: HueBridgeV2 instance
+            light_ids: List of light IDs to apply effect to
+            options: EffectOptions for the effect
+            count: Number of blinks (default 3)
+            interval_ms: Time between blinks in milliseconds (default 500)
+        """
+        super().__init__(bridge, light_ids, options)
+        self.count = count
+        self.interval_ms = interval_ms
 
-        await asyncio.sleep(interval_s)
+    async def _apply_effect(self) -> None:
+        """Apply the blink effect to all lights.
 
-        # Turn on
-        for light_id in light_ids:
-            light = client.bridge.lights.get(light_id)
-            if light:
-                await light.set_state(on=True)
+        Blinks lights on and off count times.
+        """
+        interval_s = self.interval_ms / 1000.0
 
-        await asyncio.sleep(interval_s)
+        # Perform blinks
+        for _ in range(self.count):
+            # Turn off
+            for light_id in self.light_ids:
+                if light_id in self.bridge.lights:
+                    try:
+                        await self.bridge.lights.set_state(light_id, on=False)
+                    except Exception:
+                        pass
 
-    # Restore original state if requested
-    if restore:
-        for light_id, state in original_states.items():
-            light = client.bridge.lights.get(light_id)
-            if light:
-                await light.set_state(on=state["on"], brightness=state["brightness"])
+            await asyncio.sleep(interval_s)
+
+            # Turn on
+            for light_id in self.light_ids:
+                if light_id in self.bridge.lights:
+                    try:
+                        await self.bridge.lights.set_state(light_id, on=True)
+                    except Exception:
+                        pass
+
+            await asyncio.sleep(interval_s)

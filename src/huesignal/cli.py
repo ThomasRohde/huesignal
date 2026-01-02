@@ -16,8 +16,23 @@ from huesignal.hue_client import HueClient, HueConnectionError
 from huesignal.lights import list_lights, show_light
 from huesignal.logging_config import setup_logging
 from huesignal.samples import get_sample, list_samples
+from huesignal.cli_examples import EXPLAIN_TEXT
 
-app = typer.Typer(help="Philips Hue notification system CLI")
+app = typer.Typer(
+    help="""Philips Hue notification system for visual feedback from AI agents and automation.
+    
+    Use huesignal to control Hue lights for status signals, notifications, and effects.
+    Perfect for coding agents to provide visual feedback on task status.
+    
+    Quick Start:
+      huesignal auth login              # First time setup
+      huesignal lights list             # Discover your lights
+      huesignal effect apply pulse -l desk-light -c green -b 100  # Signal success
+    
+    For detailed examples: huesignal --explain
+    """,
+    no_args_is_help=True,
+)
 
 # Global options
 bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge")
@@ -32,6 +47,13 @@ def version_callback(value: bool) -> None:
     """Print version and exit."""
     if value:
         typer.echo(__version__)
+        raise typer.Exit()
+
+
+def explain_callback(value: bool) -> None:
+    """Print comprehensive usage examples for coding agents and exit."""
+    if value:
+        typer.echo(EXPLAIN_TEXT)
         raise typer.Exit()
 
 
@@ -113,6 +135,7 @@ def get_bridge_ip(
 def main(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", callback=version_callback, is_eager=True, help="Show version and exit"),
+    explain: bool = typer.Option(False, "--explain", callback=explain_callback, is_eager=True, help="Show comprehensive usage examples and patterns for coding agents"),
     bridge_ip: Optional[str] = bridge_ip,
     verbose: bool = verbose,
     quiet: bool = quiet,
@@ -120,7 +143,18 @@ def main(
     trace_mode: bool = trace,
     timeout_ms_val: int = timeout_ms,
 ) -> None:
-    """Main CLI entry point with global options."""
+    """Philips Hue notification system for visual feedback from AI agents and automation.
+    
+    Control Hue lights to provide visual signals for task status, notifications, and effects.
+    Perfect for coding agents (like Copilot) to signal progress during automated workflows.
+    
+    Common Agent Patterns:
+      - Task started:    huesignal effect apply pulse -l desk-light -c blue -b 0.5
+      - Task complete:   huesignal effect apply pulse -l desk-light -c green -b 0.7
+      - Error/blocker:   huesignal effect apply blink -l desk-light -c red --count 3
+    
+    For thorough examples and patterns, run: huesignal --explain
+    """
     # Set up logging
     setup_logging(verbose=verbose, trace=trace_mode)
 
@@ -151,24 +185,69 @@ def main(
 
 
 # Command groups
-auth_app = typer.Typer(help="Authentication commands")
-lights_app = typer.Typer(help="Lights commands")
-effect_app = typer.Typer(help="Effect commands")
-samples_app = typer.Typer(help="Samples commands")
-cache_app = typer.Typer(help="Cache management commands")
+auth_app = typer.Typer(help="""Authenticate with Philips Hue bridge.
+
+First-time setup: Run 'huesignal auth login' to pair with your bridge.
+Credentials are securely stored in Windows Credential Manager.""")
+
+lights_app = typer.Typer(help="""Control and query Hue lights.
+
+Discover lights, toggle power, adjust brightness, and show detailed info.
+Use 'huesignal lights list' to see all available lights.""")
+
+effect_app = typer.Typer(help="""Apply visual effects to lights.
+
+Available effects: pulse, breathe, blink, rainbow.
+Ideal for notifications and status signals in automated workflows.
+
+Example: huesignal effect apply pulse -l desk-light -c green -b 0.7""")
+
+samples_app = typer.Typer(help="""Automation templates and examples.
+
+Pre-built templates for common automation scenarios (CI/CD, GitHub Actions, etc.).
+Use 'huesignal samples list' to see available templates.""")
+
+cache_app = typer.Typer(help="""Manage cached bridge and light data.
+
+Clear stale cache, set default bridge, or prune expired entries.
+Useful when bridge IP changes or experiencing connectivity issues.""")
 
 
 @auth_app.command()
 def login(
-    bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge"),
-    print_key: bool = typer.Option(False, "--print", help="Print the key instead of storing it"),
-    timeout: int = typer.Option(30, "--timeout", help="Timeout in seconds for link button press"),
+    bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge (auto-discovered if omitted)"),
+    print_key: bool = typer.Option(False, "--print", help="Print the app key to stdout instead of storing in credential manager"),
+    timeout: int = typer.Option(30, "--timeout", help="Seconds to wait for link button press (default: 30)"),
 ) -> None:
-    """Login to Philips Hue bridge.
+    """Authenticate and pair with your Philips Hue bridge.
 
-    This command initiates the pairing process with your Philips Hue bridge.
-    You must press the link button on your bridge within the timeout period.
-    The app key will be stored in Windows Credential Manager for future use.
+    First-time setup command that creates and stores credentials for bridge access.
+    
+    Process:
+      1. Discovers bridge automatically (or uses --bridge-ip)
+      2. Prompts you to press the link button on your physical bridge
+      3. Creates an app key with bridge API access
+      4. Stores credentials securely in Windows Credential Manager
+      5. Caches bridge IP for future commands
+    
+    Examples:
+      # Auto-discover bridge and store credentials
+      huesignal auth login
+      
+      # Specify bridge IP manually
+      huesignal auth login --bridge-ip 192.168.1.100
+      
+      # Print key without storing (for manual credential management)
+      huesignal auth login --print
+      
+      # Increase timeout for slow networks
+      huesignal auth login --timeout 60
+    
+    Required: You must physically press the link button on your Hue bridge
+    within the timeout period. The button is typically on top of the bridge.
+    
+    Note: This command only needs to be run once. Credentials persist across
+    sessions and are automatically used by all huesignal commands.
     """
     # Discover bridge if not provided
     if not bridge_ip:
@@ -220,12 +299,35 @@ def login(
 @lights_app.command(name="list")
 def list_cmd(
     ctx: typer.Context,
-    filter_name: Optional[str] = typer.Option(None, "--filter", help="Filter lights by name substring"),
+    filter_name: Optional[str] = typer.Option(None, "--filter", "-f", help="Filter lights by name substring (case-insensitive)"),
 ) -> None:
-    """List lights on the Hue Bridge.
+    """List all lights available on your Hue bridge.
 
-    Displays all available lights with their status and capabilities.
-    Use --filter to search by name (case-insensitive).
+    Displays a formatted table with light names, IDs, status, and capabilities.
+    Use this command to discover light names for use in other commands.
+    
+    Table Columns:
+      - Name:        Human-readable light name
+      - Short ID:    First 8 characters of light UUID
+      - On:          Power state (✓ = on, ✗ = off)
+      - Reachable:   Network connectivity (✓ = online, ✗ = offline)
+      - Color:       Color support (✓ = supports color, ✗ = white only)
+      - Brightness:  Current brightness percentage (0-100%)
+    
+    Examples:
+      # List all lights
+      huesignal lights list
+      
+      # Find lights matching "desk"
+      huesignal lights list --filter desk
+      huesignal lights list -f bedroom
+      
+      # Get JSON output for scripting
+      huesignal lights list --json
+      huesignal lights list --json --quiet | jq '.lights[].name'
+    
+    Use --json flag for machine-readable output in automation scripts.
+    Combine with --quiet to suppress informational messages.
     """
     # Get global options from context
     opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
@@ -469,19 +571,72 @@ def effect_list() -> None:
 @effect_app.command()
 def apply(
     ctx: typer.Context,
-    effect_name: str = typer.Argument(..., help="Effect name (pulse, rainbow)"),
-    light: Optional[str] = typer.Option(None, "--light", "-l", help="Light name (defaults to all lights)"),
-    brightness: Optional[int] = typer.Option(None, "--brightness", "-b", help="Brightness (1-254)"),
-    color: Optional[str] = typer.Option(None, "--color", "-c", help="Color name or hex code"),
-    duration: int = typer.Option(1000, "--duration", "-d", help="Duration in milliseconds"),
-    count: int = typer.Option(1, "--count", help="Number of cycles (for pulse effect)"),
-    no_restore: bool = typer.Option(False, "--no-restore", help="Don't restore original state after effect"),
+    effect_name: str = typer.Argument(..., help="Effect name: pulse, breathe, blink, or rainbow (see 'effect list')"),
+    light: Optional[str] = typer.Option(None, "--light", "-l", help="Target light name (omit to apply to ALL lights)"),
+    brightness: Optional[int] = typer.Option(None, "--brightness", "-b", help="Brightness: 0-100 (%), 0.0-1.0 (decimal), or 1-254 (raw)"),
+    color: Optional[str] = typer.Option(None, "--color", "-c", help="Color: name (red, green, blue, etc.) or hex (#FF0000)"),
+    duration: int = typer.Option(1000, "--duration", "-d", help="Effect duration in milliseconds (default: 1000)"),
+    count: int = typer.Option(1, "--count", help="Number of cycles/repeats for pulse/blink effects (default: 1)"),
+    no_restore: bool = typer.Option(False, "--no-restore", help="Don't restore original light state after effect (leaves light in effect's final state)"),
 ) -> None:
-    """Apply effect to lights.
+    """Apply a visual effect to one or more lights.
 
+    Create visual notifications and status signals using dynamic light effects.
+    Perfect for automation workflows, CI/CD feedback, and agent status updates.
+    
+    Effects:
+      pulse    - Quick flash, ideal for notifications (configurable count/brightness)
+      breathe  - Smooth fade in/out, good for ambient feedback
+      blink    - Rapid on/off toggle, attention-grabbing for alerts
+      rainbow  - Color cycle animation, celebratory or demo
+    
+    Colors (--color / -c):
+      Named: red, green, blue, yellow, orange, purple, pink, cyan, white
+      Hex:   #FF0000 (red), #00FF00 (green), #0000FF (blue)
+      Short: "short" (brief white flash), "long" (extended white flash)
+    
+    Brightness (--brightness / -b):
+      Percentage:  0-100      (e.g., 75 = 75%)
+      Decimal:     0.0-1.0    (e.g., 0.75 = 75%)
+      Raw:         1-254      (Hue API values)
+    
+    Duration (--duration / -d):
+      Time in milliseconds for the effect to complete.
+      Shorter = faster, longer = smoother/slower.
+      Typical: 500-3000ms
+    
     Examples:
-        huesignal effect apply pulse --light PC --brightness 200 --count 3
-        huesignal effect apply rainbow --light PC --duration 3000
+      # Single green pulse (task complete signal)
+      huesignal effect apply pulse -l desk-light -c green -b 0.7
+      
+      # Three red blinks (error/blocker signal)
+      huesignal effect apply blink -l desk-light -c red --count 3 -b 1.0
+      
+      # Blue pulse (task started signal)
+      huesignal effect apply pulse -l desk-light -c blue -b 0.5
+      
+      # Smooth yellow breathe (warning state)
+      huesignal effect apply breathe -l desk-light -c yellow -d 2000
+      
+      # Rainbow celebration (all tests pass)
+      huesignal effect apply rainbow -l desk-light -d 3000
+      
+      # Apply to ALL lights (omit -l flag)
+      huesignal effect apply pulse -c green -b 0.8
+      
+      # Don't restore state (leave light in effect color)
+      huesignal effect apply pulse -l desk-light -c red --no-restore
+    
+    Agent Workflow Patterns:
+      Task claimed:     pulse -c blue -b 0.5
+      Task complete:    pulse -c green -b 0.7
+      Error/blocker:    blink -c red --count 3 -b 1.0
+      Verification:     pulse -c green -b 1.0
+    
+    By default, lights restore to their original state after the effect completes.
+    Use --no-restore to leave lights in the effect's final state.
+    
+    Tip: Wrap commands in '2>/dev/null || true' for graceful failures in scripts.
     """
     from huesignal.effects import EffectOptions, get_effect_class
     from huesignal.resolver import resolve_lights
@@ -589,12 +744,52 @@ def samples_show(
 
 @app.command()
 def doctor(
-    bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="IP address of Philips Hue bridge"),
-    verbose: bool = typer.Option(False, "--verbose", help="Enable verbose output"),
+    bridge_ip: Optional[str] = typer.Option(None, "--bridge-ip", help="Bridge IP to diagnose (auto-discovered if omitted)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed diagnostic information"),
 ) -> None:
-    """Run diagnostic checks for huesignal setup.
+    """Run comprehensive diagnostic checks for huesignal setup.
 
-    Checks bridge connectivity, credentials, and API functionality.
+    Verifies your huesignal installation, bridge connectivity, authentication,
+    and API access. Use this command to troubleshoot configuration issues.
+    
+    Checks Performed:
+      ✓ Bridge discovery and network reachability
+      ✓ Cached bridge IP validity
+      ✓ Stored credentials existence and format
+      ✓ API authentication and permissions
+      ✓ Light enumeration and accessibility
+      ✓ Basic API functionality
+    
+    Exit Codes:
+      0 - All checks passed
+      1 - One or more checks failed
+    
+    Examples:
+      # Run diagnostics with auto-discovery
+      huesignal doctor
+      
+      # Show detailed output
+      huesignal doctor --verbose
+      huesignal doctor -v
+      
+      # Check specific bridge
+      huesignal doctor --bridge-ip 192.168.1.100
+      
+      # Silent check (use exit code only)
+      huesignal doctor --quiet
+      if [ $? -eq 0 ]; then echo "Ready"; fi
+    
+    Use this command:
+      - After first installation
+      - When commands fail with connection errors
+      - After moving bridge to new IP
+      - When troubleshooting authentication issues
+    
+    Common Issues:
+      - "No credentials found" → Run 'huesignal auth login'
+      - "Bridge not found" → Check bridge power and network
+      - "API error" → Re-run 'huesignal auth login'
+      - "Light not reachable" → Check light power and Zigbee network
     """
     try:
         status = asyncio.run(run_doctor(bridge_ip=bridge_ip, verbose=verbose))

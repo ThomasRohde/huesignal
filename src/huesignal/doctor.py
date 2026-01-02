@@ -96,8 +96,8 @@ async def run_doctor(bridge_ip: Optional[str] = None, verbose: bool = False) -> 
         logger.debug(f"Testing connection to bridge at {bridge_ip}...")
         async with HueClient(bridge_ip, app_key) as client:
             # Try to fetch lights to verify connection works
-            lights = client.bridge.lights
-            light_count = len(lights) if lights else 0
+            lights_controller = client.bridge.lights
+            light_count = len(lights_controller.items) if lights_controller and hasattr(lights_controller, 'items') else 0
             status.add_check("Bridge Connectivity", True, f"Connected successfully ({light_count} lights found)")
             logger.debug(f"Successfully connected to bridge. Found {light_count} lights.")
     except HueConnectionError as e:

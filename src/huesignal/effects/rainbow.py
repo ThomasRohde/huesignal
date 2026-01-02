@@ -97,17 +97,18 @@ class Rainbow(Effect):
 
             # Apply color to all color lights
             for light_id in light_ids:
-                light = self.bridge.lights.get(light_id)
-                if not light:
+                if light_id not in self.bridge.lights:
                     continue
 
                 try:
-                    await light.set_state(
-                        color=xy,
-                        transition_time=int(step_duration),
+                    await self.bridge.lights.set_color(
+                        light_id,
+                        xy=xy,
+                        transition_time=int(step_duration)
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.debug(f"Failed to set color for {light_id}: {e}")
 
             # Wait before next step
             await asyncio.sleep(step_duration / 1000.0)
@@ -139,17 +140,19 @@ class Rainbow(Effect):
 
             # Apply brightness to all non-color lights
             for light_id in light_ids:
-                light = self.bridge.lights.get(light_id)
-                if not light:
+                if light_id not in self.bridge.lights:
                     continue
 
                 try:
-                    await light.set_state(
+                    await self.bridge.lights.set_state(
+                        light_id,
+                        on=True,
                         brightness=brightness,
                         transition_time=int(step_duration),
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.debug(f"Failed to set brightness for {light_id}: {e}")
 
             # Wait before next step
             await asyncio.sleep(step_duration / 1000.0)

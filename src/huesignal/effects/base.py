@@ -131,7 +131,7 @@ class Effect(ABC):
             try:
                 rgb = parse_color(color_to_use)
                 xy = rgb_to_xy(*rgb)
-                state_update["color"] = xy
+                state_update["color_xy"] = xy
             except ValueError:
                 # Skip color if invalid
                 pass
@@ -144,10 +144,11 @@ class Effect(ABC):
 
         # Apply state update
         try:
-            await light.set_state(**state_update)
-        except Exception:
-            # Ignore errors on individual lights
-            pass
+            await self.bridge.lights.set_state(light_id, **state_update)
+        except Exception as e:
+            # Log error but continue with other lights
+            import logging
+            logging.debug(f"Failed to set light state for {light_id}: {e}")
 
 
 # Registry of available effects
