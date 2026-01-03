@@ -191,6 +191,36 @@ tracks:                         # Required: List of light tracks
           brightness: 150       # 1-254
           color: "#FF6600"      # Hex, name, or [x, y] tuple
           transition_ms: 300    # Fade duration
+
+      # Parallel execution - use start_ms for absolute positioning
+      - start_ms: 0             # Starts at time 0
+        effect: pulse
+        duration_ms: 2000
+      - start_ms: 0             # Also starts at 0 - runs in parallel!
+        effect: breathe
+        duration_ms: 2000
+```
+
+### Parallel Execution
+
+By default, steps run sequentially. Use `start_ms` to specify absolute start times for parallel execution:
+
+```yaml
+steps:
+  # These run in parallel (both start at 0ms)
+  - start_ms: 0
+    effect: pulse
+    options: { color: blue, count: 3 }
+    duration_ms: 3000
+  - start_ms: 0
+    effect: breathe
+    options: { color: cyan }
+    duration_ms: 3000
+  
+  # This runs after (starts at 3000ms)
+  - start_ms: 3000
+    effect: rainbow
+    duration_ms: 2000
 ```
 
 ### Example: Celebration Sequence

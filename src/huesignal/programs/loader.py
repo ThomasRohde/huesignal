@@ -131,36 +131,62 @@ def _parse_track(data: Any) -> LightTrack:
         raise ValueError("Track must have at least one step")
 
     # Parse steps and calculate start times
+    # Steps can have explicit start_ms for parallel execution
     steps: list[TimelineStep] = []
     current_time_ms = 0
 
     for i, step_data in enumerate(steps_data):  # type: ignore[arg-type]
         try:
-            step, duration = _parse_step(step_data, current_time_ms)
+            step, timeline_advance = _parse_step(step_data, current_time_ms)
             steps.append(step)
-            current_time_ms += duration
+            # Only advance timeline if step doesn't have explicit start_ms
+            # (timeline_advance will be 0 for explicitly positioned steps)
+            current_time_ms += timeline_advance
         except ValueError as e:
             raise ValueError(f"Error in step {i}: {e}") from e
 
     return LightTrack(light_pattern=light_pattern, steps=steps)
 
 
-def _parse_step(data: Any, start_ms: int) -> tuple[TimelineStep, int]:
+def _parse_step(data: Any, current_time_ms: int) -> tuple[TimelineStep, int]:
     """Parse a single step from YAML data.
 
     Args:
         data: Step data dictionary
-        start_ms: Start time for this step in milliseconds
+        current_time_ms: Current timeline position in milliseconds
 
     Returns:
-        Tuple of (TimelineStep, duration_ms) where duration_ms is how much time
-        this step advances the timeline
+        Tuple of (TimelineStep, timeline_advance) where timeline_advance is how
+        much time this step advances the timeline. If start_ms is explicit,
+        timeline_advance is 0 (step doesn't advance sequential timeline).
 
     Raises:
         ValueError: If step data is invalid
+
+    Note:
+        Steps can specify explicit `start_ms` for parallel execution within a track.
+        When start_ms is provided, the step starts at that absolute time and does
+        not advance the sequential timeline. This enables parallel steps:
+
+        steps:
+          - start_ms: 0
+            effect: pulse
+            duration_ms: 2000
+          - start_ms: 0          # Runs in parallel with above!
+            effect: breathe
+            duration_ms: 2000
+          - effect: rainbow      # Starts at 0ms (after parallel steps)
+            duration_ms: 1000
     """
     if not isinstance(data, dict):
         raise ValueError("Step must be a dictionary")
+
+    # Check for explicit start_ms (enables parallel execution)
+    explicit_start_ms: int | None = None
+    if "start_ms" in data:
+        explicit_start_ms = data["start_ms"]  # type: ignore[assignment]
+        if not isinstance(explicit_start_ms, int) or explicit_start_ms < 0:
+            raise ValueError("Field 'start_ms' must be a non-negative integer")
 
     # Determine step type and parse action
     if "effect" in data:
@@ -179,8 +205,18 @@ def _parse_step(data: Any, start_ms: int) -> tuple[TimelineStep, int]:
             raise ValueError("Field 'duration_ms' must be a non-negative integer")
         duration = explicit_duration
 
+    # Determine actual start time and timeline advance
+    if explicit_start_ms is not None:
+        # Explicit positioning: use provided start_ms, don't advance timeline
+        start_ms = explicit_start_ms
+        timeline_advance = 0
+    else:
+        # Sequential: use current timeline position, advance by duration
+        start_ms = current_time_ms
+        timeline_advance = duration
+
     step = TimelineStep(start_ms=start_ms, duration_ms=duration, action=action)
-    return step, duration
+    return step, timeline_advance
 
 
 def _parse_effect_action(data: dict[str, Any]) -> tuple[EffectAction, int]:

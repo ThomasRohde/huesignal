@@ -1,0 +1,45 @@
+# Parallel Steps Demo - Multiple effects on same light simultaneously
+#
+# Demonstrates the `start_ms` feature for parallel execution within a track.
+# Steps with explicit `start_ms` run at that absolute time and don't advance
+# the sequential timeline, enabling parallel effects.
+#
+# Usage: huesignal run examples/parallel-demo.yaml
+
+name: parallel-demo
+description: Demonstrates parallel step execution on the same light
+
+tracks:
+  - light: PC
+    steps:
+      # These two effects start at the same time (parallel)
+      - start_ms: 0
+        effect: pulse
+        options:
+          color: blue
+          count: 3
+        duration_ms: 3000
+      
+      - start_ms: 0
+        effect: breathe
+        options:
+          color: cyan
+        duration_ms: 3000
+      
+      # This starts at 3000ms (after the parallel effects)
+      - start_ms: 3000
+        set:
+          brightness: 254
+          color: success
+          transition_ms: 500
+      
+      # Sequential step (no start_ms) - continues from last position
+      # Since previous step was at 3000ms with 500ms duration, 
+      # and it was explicit, this starts at 0ms (timeline didn't advance)
+      # To chain after explicit steps, use explicit start_ms
+      - start_ms: 3500
+        effect: pulse
+        options:
+          color: celebration
+          count: 2
+        duration_ms: 1500

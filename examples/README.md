@@ -26,6 +26,8 @@ huesignal run examples/celebration.yaml --dry-run
 | [alert-cascade.yaml](alert-cascade.yaml) | Critical event attention sequence | ~9 seconds |
 | [agent-workflow.yaml](agent-workflow.yaml) | Complete AI agent task cycle | ~16 seconds |
 | [meeting-countdown.yaml](meeting-countdown.yaml) | Progressive urgency timer | ~20 seconds |
+| [symphony.yaml](symphony.yaml) | Multi-light coordinated choreography | ~9 seconds |
+| [parallel-demo.yaml](parallel-demo.yaml) | Parallel step execution demo | ~5 seconds |
 
 ## Customizing
 
@@ -44,6 +46,22 @@ Or use patterns to target multiple lights:
 tracks:
   - light: "office-*"        # All lights starting with "office-"
 ```
+
+## Parallel Execution
+
+Use `start_ms` to run multiple effects at the same time on one light:
+
+```yaml
+steps:
+  - start_ms: 0              # Both start at time 0
+    effect: pulse
+    duration_ms: 2000
+  - start_ms: 0              # Runs in parallel!
+    effect: breathe
+    duration_ms: 2000
+```
+
+See [parallel-demo.yaml](parallel-demo.yaml) for a complete example.
 
 ## Creating Your Own
 
