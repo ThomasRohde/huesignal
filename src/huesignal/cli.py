@@ -124,13 +124,13 @@ def run_getting_started_wizard() -> None:
                     typer.echo("  huesignal auth login --bridge-ip YOUR_BRIDGE_IP")
                     return
 
-                bridge_ip = bridges[0][0]
+                bridge_ip = bridges[0].get("internalipaddress")
                 typer.secho(f"✓ Found bridge: {bridge_ip}", fg=typer.colors.GREEN)
 
                 # Authenticate
                 typer.echo("Requesting credentials (30s timeout)...")
                 app_key = asyncio.run(auth_login(bridge_ip, timeout=30))
-                store_app_key(bridge_ip, app_key)
+                store_app_key(app_key)
                 set_default_bridge_ip(bridge_ip)
 
                 typer.secho("✓ Authentication successful!", fg=typer.colors.GREEN)
@@ -394,7 +394,8 @@ effect_app = typer.Typer(
 Available effects: pulse, breathe, blink, rainbow.
 Ideal for notifications and status signals in automated workflows.
 
-Example: huesignal effect apply pulse -l desk-light -c green -b 0.7"""
+Example: huesignal effect apply pulse -l desk-light -c green -b 0.7
+Quick presets: huesignal effect preset success"""
 )
 
 samples_app = typer.Typer(
@@ -1198,10 +1199,23 @@ def apply(
                 typer.echo(f"Applying '{effect_name}' to {len(light_ids)} light(s)")
 
             # Get effect class
-            try:
-                effect_class = get_effect_class(effect_name)
-            except ValueError as e:
-                typer.secho(f"Error: {e}", fg=typer.colors.RED)
+            effect_class = get_effect_class(effect_name)
+            if effect_class is None:
+                # Show available effects with suggestions
+                from huesignal.effects import list_effects
+
+                available = [name for name, _ in list_effects()]
+
+                # Find close matches using simple similarity
+                suggestions = [
+                    e for e in available if effect_name.lower() in e.lower() or e.lower() in effect_name.lower()
+                ]
+
+                error_msg = f"Unknown effect: '{effect_name}'\n\nAvailable effects: {', '.join(available)}"
+                if suggestions:
+                    error_msg += f"\n\nDid you mean: {', '.join(suggestions)}?"
+
+                typer.secho(error_msg, fg=typer.colors.RED)
                 raise typer.Exit(1)
 
             # Create effect options
@@ -1535,6 +1549,389 @@ def play(
         if exit_code and exit_code != 0:
             raise typer.Exit(exit_code)
     except KeyboardInterrupt:
+        raise typer.Exit(130)
+    except Exception as e:
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        elif opts.trace:
+            raise
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@effect_app.command()
+def preset(
+    ctx: typer.Context,
+    preset_name: str = typer.Argument(
+        ...,
+        help="Preset name: success, error, warning, working, complete, claim, verify, blocker",
+    ),
+    light: str | None = typer.Option(
+        None,
+        "--light",
+        "-l",
+        help="Target light name (omit to apply to ALL lights, or set HUESIGNAL_LIGHT_NAME env var)",
+    ),
+) -> None:
+    """Apply a semantic preset effect for common workflow scenarios.
+
+    Presets provide standardized visual signals for agent workflows and automation.
+    Each preset combines effect, color, brightness, and duration into a ready-to-use command.
+
+    Agent Workflow Presets:
+      success    - Task completed successfully (green pulse, bright)
+      error      - Error encountered (red blink x3, bright)
+      warning    - Warning or attention needed (orange pulse, medium)
+      working    - Task in progress (blue breathe, subtle)
+      complete   - Verification complete (green pulse x2, bright)
+      claim      - Task claimed (blue pulse, medium)
+      verify     - Verification in progress (cyan breathe, medium)
+      blocker    - Critical blocker (red blink x5, very bright)
+
+    Examples:
+      # Task completed successfully
+      huesignal effect preset success -l desk-light
+
+      # Error encountered
+      huesignal effect preset error -l desk-light
+
+      # Task claimed (agent workflow)
+      huesignal effect preset claim
+
+      # Critical blocker
+      huesignal effect preset blocker -l desk-light
+
+    Tip: Set HUESIGNAL_LIGHT_NAME environment variable to omit -l flag.
+    """
+    import os
+
+    from huesignal.effects import EffectOptions, get_effect_class
+    from huesignal.resolver import resolve_lights
+
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    # Define presets with their parameters
+    presets = {
+        "success": {"effect": "pulse", "color": "success", "brightness": 0.8, "duration": 1000, "count": 1},
+        "error": {"effect": "blink", "color": "error", "brightness": 1.0, "duration": 1500, "count": 3},
+        "warning": {"effect": "pulse", "color": "warning", "brightness": 0.7, "duration": 1200, "count": 1},
+        "working": {"effect": "breathe", "color": "working", "brightness": 0.5, "duration": 2000, "count": 1},
+        "complete": {"effect": "pulse", "color": "success", "brightness": 0.9, "duration": 800, "count": 2},
+        "claim": {"effect": "pulse", "color": "blue", "brightness": 0.6, "duration": 1000, "count": 1},
+        "verify": {"effect": "breathe", "color": "cyan", "brightness": 0.6, "duration": 1500, "count": 1},
+        "blocker": {"effect": "blink", "color": "error", "brightness": 1.0, "duration": 2000, "count": 5},
+    }
+
+    if preset_name not in presets:
+        available = ", ".join(sorted(presets.keys()))
+        typer.secho(f"Unknown preset: '{preset_name}'\\n\\nAvailable presets: {available}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    preset_config = presets[preset_name]
+
+    # Check for default light name in environment if --light not provided
+    if light is None:
+        default_light = os.environ.get("HUESIGNAL_LIGHT_NAME")
+        if default_light:
+            light = default_light
+            if not opts.quiet:
+                typer.echo(f"Using default light from HUESIGNAL_LIGHT_NAME: {light}")
+
+    # Get bridge IP (with caching)
+    bridge_ip = get_bridge_ip(opts.bridge_ip, opts.quiet)
+
+    # Get credentials
+    try:
+        app_key = get_app_key()
+        if not app_key:
+            typer.secho("Error: No app key found. Please run 'huesignal auth login' first.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    except AuthError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Run preset effect
+    async def run_preset():
+        async with HueClient(bridge_ip, app_key) as client:
+            # Resolve lights
+            light_names = [light] if light else None
+            resolved = await resolve_lights(client.bridge, light_names=light_names)
+            light_ids = [r.light_id for r in resolved]
+
+            if not opts.quiet:
+                typer.echo(f"Applying preset '{preset_name}' to {len(light_ids)} light(s)")
+
+            # Get effect class
+            effect_class = get_effect_class(preset_config["effect"])
+            if effect_class is None:
+                typer.secho("Error: Internal preset error - unknown effect", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            # Create effect options
+            effect_options = EffectOptions(
+                duration_ms=preset_config["duration"],
+                brightness=preset_config["brightness"],
+                color=preset_config["color"],
+                restore=True,
+            )
+
+            # Normalize brightness
+            from huesignal.effects import normalize_brightness
+
+            effect_options.brightness = normalize_brightness(preset_config["brightness"])
+
+            # Create and apply effect
+            effect_params = {}
+            if "count" in preset_config:
+                effect_params["count"] = preset_config["count"]
+
+            effect = effect_class(client.bridge, light_ids, effect_options, **effect_params)
+            failed_lights = await effect.apply()
+
+            if opts.json_output:
+                import json
+
+                typer.echo(
+                    json.dumps(
+                        {
+                            "success": len(failed_lights) == 0,
+                            "preset": preset_name,
+                            "lights_affected": len(light_ids),
+                            "failed_lights": failed_lights,
+                        },
+                        indent=2,
+                    )
+                )
+                if failed_lights:
+                    return 2
+            elif not opts.quiet:
+                if failed_lights:
+                    typer.secho(
+                        f"Preset applied with warnings: {len(failed_lights)} light(s) failed to restore.",
+                        fg=typer.colors.YELLOW,
+                    )
+                    return 2
+                else:
+                    typer.secho("Preset applied successfully!", fg=typer.colors.GREEN)
+            elif failed_lights:
+                return 2
+
+    try:
+        exit_code = asyncio.run(run_preset())
+        if exit_code and exit_code != 0:
+            raise typer.Exit(exit_code)
+    except Exception as e:
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        elif opts.trace:
+            raise
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@effect_app.command()
+def demo(
+    ctx: typer.Context,
+    light: str | None = typer.Option(
+        None,
+        "--light",
+        "-l",
+        help="Target light name (omit to apply to ALL lights, or set HUESIGNAL_LIGHT_NAME env var)",
+    ),
+    quick: bool = typer.Option(False, "--quick", help="Run quick demo (30s instead of full 2min demo)"),
+) -> None:
+    """Demonstrate all available effects with visual examples.
+
+    Runs through each effect type to show what they look like in action.
+    Perfect for first-time setup to see your lights respond and understand effect behaviors.
+
+    Full Demo (2 minutes):
+      - Pulse effect (notification flash)
+      - Breathe effect (smooth fade)
+      - Blink effect (attention-grabbing)
+      - Rainbow effect (color cycle)
+      - Multiple semantic colors
+
+    Quick Demo (30 seconds):
+      - One example of each major effect type
+
+    Examples:
+      huesignal effect demo -l desk-light
+      huesignal effect demo --quick
+      huesignal effect demo    # Uses all lights
+
+    Tip: Watch your lights during the demo to see effect timing and appearance.
+    """
+    import os
+
+    from huesignal.effects import EffectOptions, get_effect_class
+    from huesignal.resolver import resolve_lights
+
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    # Check for default light name in environment if --light not provided
+    if light is None:
+        default_light = os.environ.get("HUESIGNAL_LIGHT_NAME")
+        if default_light:
+            light = default_light
+            if not opts.quiet:
+                typer.echo(f"Using default light from HUESIGNAL_LIGHT_NAME: {light}")
+
+    # Get bridge IP (with caching)
+    bridge_ip = get_bridge_ip(opts.bridge_ip, opts.quiet)
+
+    # Get credentials
+    try:
+        app_key = get_app_key()
+        if not app_key:
+            typer.secho("Error: No app key found. Please run 'huesignal auth login' first.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    except AuthError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Define demo sequence
+    if quick:
+        demo_sequence = [
+            {"name": "Pulse (green)", "effect": "pulse", "color": "green", "brightness": 0.7, "duration": 1000},
+            {"name": "Breathe (blue)", "effect": "breathe", "color": "blue", "brightness": 0.6, "duration": 2000},
+            {"name": "Blink (red)", "effect": "blink", "color": "red", "brightness": 1.0, "duration": 1500, "count": 3},
+            {"name": "Rainbow", "effect": "rainbow", "brightness": 0.8, "duration": 3000},
+        ]
+    else:
+        demo_sequence = [
+            {
+                "name": "Pulse - Green (success)",
+                "effect": "pulse",
+                "color": "green",
+                "brightness": 0.8,
+                "duration": 1000,
+            },
+            {"name": "Pulse - Blue (info)", "effect": "pulse", "color": "blue", "brightness": 0.7, "duration": 1000},
+            {
+                "name": "Pulse - Orange (warning)",
+                "effect": "pulse",
+                "color": "orange",
+                "brightness": 0.7,
+                "duration": 1000,
+            },
+            {
+                "name": "Breathe - Cyan (working)",
+                "effect": "breathe",
+                "color": "cyan",
+                "brightness": 0.5,
+                "duration": 2500,
+            },
+            {
+                "name": "Breathe - Purple",
+                "effect": "breathe",
+                "color": "purple",
+                "brightness": 0.6,
+                "duration": 2500,
+            },
+            {
+                "name": "Blink - Red (error)",
+                "effect": "blink",
+                "color": "red",
+                "brightness": 1.0,
+                "duration": 1500,
+                "count": 3,
+            },
+            {
+                "name": "Blink - Yellow",
+                "effect": "blink",
+                "color": "yellow",
+                "brightness": 0.9,
+                "duration": 1200,
+                "count": 2,
+            },
+            {"name": "Rainbow", "effect": "rainbow", "brightness": 0.8, "duration": 5000},
+        ]
+
+    # Run demo
+    async def run_demo():
+        async with HueClient(bridge_ip, app_key) as client:
+            # Resolve lights
+            light_names = [light] if light else None
+            resolved = await resolve_lights(client.bridge, light_names=light_names)
+            light_ids = [r.light_id for r in resolved]
+
+            if not opts.quiet:
+                duration_estimate = sum(item.get("duration", 1000) for item in demo_sequence) / 1000
+                typer.secho(
+                    "\\n╔═══════════════════════════════════════╗",
+                    fg=typer.colors.BRIGHT_CYAN,
+                    bold=True,
+                )
+                typer.secho(
+                    f"║   Effect Demo ({duration_estimate:.0f}s)                    ║",
+                    fg=typer.colors.BRIGHT_CYAN,
+                    bold=True,
+                )
+                typer.secho(
+                    "╚═══════════════════════════════════════╝\\n",
+                    fg=typer.colors.BRIGHT_CYAN,
+                    bold=True,
+                )
+                typer.echo(f"Demonstrating effects on {len(light_ids)} light(s)\\n")
+
+            # Run each demo effect
+            for i, demo_item in enumerate(demo_sequence, 1):
+                if not opts.quiet:
+                    typer.secho(f"{i}. {demo_item['name']}...", fg=typer.colors.YELLOW)
+
+                # Get effect class
+                effect_class = get_effect_class(demo_item["effect"])
+                if effect_class is None:
+                    continue
+
+                # Create effect options
+                effect_options = EffectOptions(
+                    duration_ms=demo_item.get("duration", 1000),
+                    brightness=demo_item.get("brightness", 0.7),
+                    color=demo_item.get("color"),
+                    restore=True,
+                )
+
+                # Normalize brightness
+                from huesignal.effects import normalize_brightness
+
+                if effect_options.brightness is not None:
+                    effect_options.brightness = normalize_brightness(effect_options.brightness)
+
+                # Create and apply effect
+                effect_params = {}
+                if "count" in demo_item:
+                    effect_params["count"] = demo_item["count"]
+
+                effect = effect_class(client.bridge, light_ids, effect_options, **effect_params)
+                await effect.apply()
+
+                # Small pause between effects
+                if i < len(demo_sequence):
+                    await asyncio.sleep(1)
+
+            if not opts.quiet:
+                typer.echo()
+                typer.secho("✓ Demo complete!", fg=typer.colors.GREEN, bold=True)
+                typer.echo("\\nNext steps:")
+                typer.echo("  • Use 'huesignal effect apply <effect>' for manual control")
+                typer.echo("  • Use 'huesignal effect preset <name>' for workflow signals")
+                typer.echo("  • Use 'huesignal effect info' for complete reference")
+
+    try:
+        asyncio.run(run_demo())
+    except KeyboardInterrupt:
+        if not opts.quiet:
+            typer.echo("\\nDemo interrupted.")
         raise typer.Exit(130)
     except Exception as e:
         if opts.json_output:

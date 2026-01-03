@@ -24,14 +24,16 @@ huesignal effect apply blink -l desk-light -c red --count 3
 # Install
 uv pip install huesignal       # or: pip install huesignal
 
-# Authenticate (press bridge link button when prompted)
-huesignal auth login
+# Interactive setup wizard (recommended for first-time users)
+huesignal --getting-started
 
-# Discover your lights
-huesignal lights list
+# Or manual setup:
+huesignal auth login           # Press bridge link button when prompted
+huesignal lights list          # Discover your lights
 
-# Signal success!
-huesignal effect apply pulse -l "your-light-name" -c green
+# Try a preset or demo
+huesignal effect preset success -l "your-light-name"
+huesignal effect demo --quick   # See all effects in action
 ```
 
 ---
@@ -75,6 +77,29 @@ pip install huesignal     # or: pipx install huesignal
 
 ## 🎨 Effects Reference
 
+### Quick Presets (New!)
+
+For common workflow scenarios, use semantic presets:
+
+```bash
+huesignal effect preset success   # Task completed (green pulse)
+huesignal effect preset error     # Error encountered (red blink x3)
+huesignal effect preset working   # In progress (blue breathe)
+huesignal effect preset claim     # Task claimed (blue pulse)
+huesignal effect preset blocker   # Critical issue (red blink x5)
+```
+
+Available presets: `success`, `error`, `warning`, `working`, `complete`, `claim`, `verify`, `blocker`
+
+### Demo Mode
+
+See all effects in action:
+
+```bash
+huesignal effect demo -l desk-light    # Full demo (~2 minutes)
+huesignal effect demo --quick          # Quick demo (~30 seconds)
+```
+
 ### Available Effects
 
 | Effect | Description | Best For |
@@ -84,13 +109,28 @@ pip install huesignal     # or: pipx install huesignal
 | `breathe` | Smooth fade in/out | Ambient status, "working" indicator |
 | `rainbow` | Color cycle animation | Celebrations, demos |
 
+### Brightness Formats (Now Consistent!)
+
+All brightness values accept three formats everywhere (CLI and YAML):
+
+- **Decimal:** `0.0-1.0` (e.g., `0.75` = 75% brightness)
+- **Percentage:** `0-100` (e.g., `75` = 75% brightness)  
+- **Raw:** `1-254` (Hue API values)
+
+```bash
+# All three are equivalent:
+huesignal effect apply pulse -b 0.8   # Decimal
+huesignal effect apply pulse -b 80    # Percentage
+huesignal effect apply pulse -b 203   # Raw API value
+```
+
 ### Common Options
 
 | Option | Short | Description | Example |
 |--------|-------|-------------|---------|
 | `--light` | `-l` | Target light name | `-l desk-light` |
 | `--color` | `-c` | Color (name or hex) | `-c green`, `-c "#FF5500"` |
-| `--brightness` | `-b` | Brightness level | `-b 0.7` (70%), `-b 100` (100%) |
+| `--brightness` | `-b` | Brightness level | `-b 0.7`, `-b 75`, `-b 191` |
 | `--duration` | `-d` | Effect duration (ms) | `-d 2000` |
 | `--count` | | Repeat count (pulse/blink) | `--count 3` |
 | `--no-restore` | | Keep final state | Don't restore original |
@@ -98,6 +138,8 @@ pip install huesignal     # or: pipx install huesignal
 ### Colors
 
 **Named colors:** `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `cyan`, `white`, `magenta`
+
+**Semantic colors:** `success` (green), `error` (red), `warning` (orange), `info` (blue), `working` (light blue), `celebration` (gold)
 
 **Semantic colors:** `success` (green), `error` (red), `warning` (orange), `info` (blue), `working` (sky blue), `celebration` (gold)
 

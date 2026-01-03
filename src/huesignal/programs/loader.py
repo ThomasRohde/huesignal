@@ -377,17 +377,32 @@ def _parse_set_action(data: dict[str, Any]) -> tuple[SetAction, int]:
     if not isinstance(on, bool):
         raise ValueError("Field 'on' must be a boolean")
 
-    if brightness is not None and (not isinstance(brightness, int) or brightness < 1 or brightness > 254):
-        raise ValueError(
-            "Field 'brightness' must be an integer between 1 and 254\n"
-            "\n"
-            "Example:\n"
-            "  set:\n"
-            "    brightness: 127  # Half brightness (1-254 range)\n"
-            "    brightness: 200  # ~80% brightness\n"
-            "\n"
-            "Use 'huesignal effect info' for brightness format reference."
-        )
+    if brightness is not None:
+        # Normalize brightness to 1-254 range (supports decimal, percentage, or raw)
+        try:
+            from huesignal.effects.base import normalize_brightness
+
+            if isinstance(brightness, (int, float)):
+                brightness = normalize_brightness(brightness)
+            else:
+                raise ValueError("Brightness must be a number")
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid brightness value: {e}\n"
+                "\n"
+                "Accepted formats:\n"
+                "  Decimal:     0.0-1.0  (e.g., 0.75 = 75%)\n"
+                "  Percentage:  0-100    (e.g., 75 = 75%)\n"
+                "  Raw:         1-254    (Hue API values)\n"
+                "\n"
+                "Example:\n"
+                "  set:\n"
+                "    brightness: 0.8   # 80% brightness (decimal)\n"
+                "    brightness: 80    # 80% brightness (percentage)\n"
+                "    brightness: 203   # 80% brightness (raw)\n"
+                "\n"
+                "Use 'huesignal effect info' for more format details."
+            ) from e
 
     if color is not None and not isinstance(color, (str, list)):
         raise ValueError("Field 'color' must be a string (hex/name) or list [x, y]")

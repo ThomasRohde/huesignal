@@ -64,7 +64,10 @@ def normalize_brightness(value: float | int) -> int:
         elif 0.0 <= value <= 100.0:
             return max(1, int((value / 100.0) * 254))
         else:
-            raise ValueError(f"Float brightness must be 0.0-1.0 or 0.0-100.0, got {value}")
+            suggestion = "Did you mean 0.5 for 50% brightness?" if value > 254 else ""
+            raise ValueError(
+                f"Float brightness must be 0.0-1.0 (decimal) or 0.0-100.0 (percentage), got {value}. {suggestion}"
+            )
     else:
         # Handle integer values
         if 0 <= value <= 100:
@@ -74,7 +77,13 @@ def normalize_brightness(value: float | int) -> int:
             # Treat as raw API value
             return value
         else:
-            raise ValueError(f"Brightness must be 0-100 (%), 0.0-1.0 (decimal), or 1-254 (raw), got {value}")
+            if value > 254:
+                suggestion = f"Did you mean {value / 254:.2f} for decimal notation?"
+            else:
+                suggestion = "Brightness must be positive."
+            raise ValueError(
+                f"Brightness must be 0-100 (%), 0.0-1.0 (decimal), or 1-254 (raw), got {value}. {suggestion}"
+            )
 
 
 def validate_brightness(value: int) -> None:
