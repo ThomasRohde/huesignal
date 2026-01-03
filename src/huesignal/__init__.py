@@ -6,4 +6,4 @@ try:
     __version__ = get_version("huesignal")
 except Exception:
     # Fallback for development installations
-    __version__ = "0.1.4"
+    __version__ = "1.0.0"
