@@ -170,7 +170,14 @@ class Rainbow(Effect):
                     continue
 
                 try:
-                    await self.bridge.lights.set_color(light_id, xy=xy, transition_time=int(step_duration))
+                    # Use set_state with color_xy parameter
+                    await self.bridge.lights.set_state(
+                        light_id,
+                        on=True,
+                        color_xy=xy,
+                        brightness=self.options.brightness,
+                        transition_time=int(step_duration),
+                    )
                 except Exception as e:
                     import logging
 
