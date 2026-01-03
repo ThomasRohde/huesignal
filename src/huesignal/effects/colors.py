@@ -18,6 +18,13 @@ COLOR_NAMES = {
     "purple": (128, 0, 128),
     "pink": (255, 192, 203),
     "brown": (165, 42, 42),
+    # Semantic aliases for agent workflows
+    "success": (0, 255, 0),  # Bright green - task complete
+    "error": (255, 0, 0),  # Red - blocker/error
+    "warning": (255, 165, 0),  # Orange - warning state
+    "info": (0, 0, 255),  # Blue - informational
+    "working": (0, 191, 255),  # Deep sky blue - task in progress
+    "celebration": (255, 215, 0),  # Gold - achievement
 }
 
 

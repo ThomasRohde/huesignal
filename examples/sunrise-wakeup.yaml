@@ -1,0 +1,50 @@
+# Sunrise Wake-Up - Gentle morning light simulation
+#
+# A gradual transition from darkness to full brightness,
+# mimicking natural sunrise. Perfect for:
+# - Morning automation
+# - Gentle wake-up calls
+# - "Start of day" system events
+#
+# Usage: huesignal run examples/sunrise-wakeup.yaml
+
+name: sunrise-wakeup
+description: Gentle dawn simulation with gradual color warming
+
+tracks:
+  - light: PC
+    steps:
+      # Phase 1: Deep darkness to first light (deep red)
+      - set:
+          on: true
+          brightness: 10
+          color: "#330000"
+          transition_ms: 2000
+      - wait: 2000
+      
+      # Phase 2: Warm orange glow emerges
+      - set:
+          brightness: 50
+          color: "#FF4500"
+          transition_ms: 3000
+      - wait: 3000
+      
+      # Phase 3: Golden sunrise
+      - set:
+          brightness: 120
+          color: "#FFD700"
+          transition_ms: 3000
+      - wait: 3000
+      
+      # Phase 4: Bright morning light
+      - set:
+          brightness: 200
+          color: "#FFFACD"
+          transition_ms: 3000
+      - wait: 3000
+      
+      # Phase 5: Full daylight
+      - set:
+          brightness: 254
+          color: white
+          transition_ms: 2000

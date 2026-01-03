@@ -43,9 +43,9 @@ Add huesignal signals at these points in your agent workflow:
 **On task claim** (step 3):
 ```bash
 # After lodestar_task_claim() succeeds
-huesignal effect apply pulse -c short -b 0.5 2>/dev/null || true
+huesignal effect apply pulse -c blue -b 0.5 2>/dev/null || true
 ```
-Short pulse indicates task acquisition.
+Blue pulse indicates task acquisition.
 
 **On task complete** (step 6):
 ```bash
@@ -57,9 +57,9 @@ Green pulse confirms successful completion.
 **On blockers/errors** (any step):
 ```bash
 # When blocked or encountering errors
-huesignal effect apply pulse -c red -b 1.0  2>/dev/null || true
+huesignal effect apply blink -c red --count 3 -b 1.0 2>/dev/null || true
 ```
-Red blinking indicates blocker or error requiring attention.
+Red blinks indicate blocker or error requiring attention.
 
 #### Implementation Notes
 

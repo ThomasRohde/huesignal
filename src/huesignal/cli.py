@@ -990,6 +990,7 @@ def play(
     ctx: typer.Context,
     program_file: str = typer.Argument(..., help="Path to YAML program file"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview program without execution"),
+    validate: bool = typer.Option(False, "--validate", help="Validate YAML syntax and structure without executing"),
     no_restore: bool = typer.Option(False, "--no-restore", help="Don't restore lights to original state after program"),
 ) -> None:
     """Execute a YAML effect program.
@@ -1001,6 +1002,14 @@ def play(
         huesignal effect play celebration.yaml
         huesignal effect play sequence.yaml --dry-run
         huesignal effect play show.yaml --no-restore
+        huesignal effect play untested.yaml --validate
+
+    Options:
+        --validate   Check YAML syntax and structure without bridge connection.
+                     Perfect for CI/CD pipelines and pre-commit hooks.
+
+        --dry-run    Preview what the program would do (requires bridge).
+                     Shows timing and tracks without applying effects.
 
     The program will execute all tracks in parallel with proper timing.
     Press Ctrl+C to interrupt and restore lights to original state.
@@ -1019,9 +1028,34 @@ def play(
         typer.secho(f"Error: Program file not found: {program_file}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    # Load program
+    # Load and validate program
     try:
         program = load_program(program_file)
+        if validate:
+            # Validation-only mode: report success and exit
+            if opts.json_output:
+                import json
+
+                typer.echo(
+                    json.dumps(
+                        {
+                            "valid": True,
+                            "program_name": program.name,
+                            "description": program.description,
+                            "tracks": len(program.tracks),
+                            "total_duration_ms": program.total_duration_ms(),
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                typer.secho(f"✓ Valid: {program_file}", fg=typer.colors.GREEN)
+                typer.echo(f"  Program: {program.name}")
+                if program.description:
+                    typer.echo(f"  Description: {program.description}")
+                typer.echo(f"  Tracks: {len(program.tracks)}")
+                typer.echo(f"  Duration: {program.total_duration_ms()}ms ({program.total_duration_ms() / 1000:.1f}s)")
+            return
         if not opts.quiet:
             typer.echo(f"Loaded program: {program.name}")
             if program.description:
@@ -1473,6 +1507,45 @@ app.add_typer(lights_app, name="lights")
 app.add_typer(effect_app, name="effect")
 app.add_typer(samples_app, name="samples")
 app.add_typer(cache_app, name="cache")
+
+
+@app.command()
+def run(
+    ctx: typer.Context,
+    program_file: str = typer.Argument(..., help="Path to YAML program file"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview program without execution"),
+    validate: bool = typer.Option(False, "--validate", help="Validate YAML syntax and structure without executing"),
+    no_restore: bool = typer.Option(False, "--no-restore", help="Don't restore lights to original state after program"),
+) -> None:
+    """Execute a YAML effect program (shorthand for 'effect play').
+
+    This is a convenient top-level command for running YAML programs.
+    Equivalent to 'huesignal effect play <file>'.
+
+    Programs enable multi-light choreography with sequenced effects,
+    perfect for creating "symphonies of light" that coordinate multiple
+    lights with precise timing.
+
+    Examples:
+        huesignal run celebration.yaml
+        huesignal run examples/sunrise-wakeup.yaml
+        huesignal run my-program.yaml --validate
+        huesignal run demo.yaml --dry-run
+
+    Options:
+        --validate   Check YAML syntax without bridge connection.
+                     Perfect for CI/CD and pre-commit validation.
+
+        --dry-run    Preview timing and tracks without applying effects.
+                     Requires bridge connection for light resolution.
+
+        --no-restore Leave lights in final state after program ends.
+
+    See 'examples/' directory for sample programs demonstrating
+    the full capabilities of huesignal choreography.
+    """
+    # Delegate to effect play command by calling it directly
+    play(ctx, program_file, dry_run, validate, no_restore)
 
 
 def cli() -> None:

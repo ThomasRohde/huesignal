@@ -33,13 +33,13 @@ class SetState:
     Attributes:
         on: Whether the light should be on or off
         brightness: Brightness level (1-254), None to leave unchanged
-        color: Color name or hex code, None to leave unchanged
+        color: Color name, hex code, or XY tuple. None to leave unchanged
         transition_ms: Transition duration in milliseconds
     """
 
     on: bool = True
     brightness: int | None = None
-    color: str | None = None
+    color: str | tuple[float, float] | None = None
     transition_ms: int = 500
 
     def __post_init__(self):
@@ -78,12 +78,20 @@ class SetState:
 
             # Add color if specified
             if self.color:
-                try:
-                    rgb = parse_color(self.color)
-                    xy = rgb_to_xy(*rgb)
-                    state_update["color_xy"] = xy
-                except ValueError as e:
-                    return PrimitiveResult(light_id=light_id, success=False, error=f"Invalid color '{self.color}': {e}")
+                # Handle color as string (name/hex) or tuple (XY coordinates)
+                if isinstance(self.color, tuple):
+                    # Already XY coordinates
+                    state_update["color_xy"] = self.color
+                else:
+                    # Parse color name or hex to XY
+                    try:
+                        rgb = parse_color(self.color)
+                        xy = rgb_to_xy(*rgb)
+                        state_update["color_xy"] = xy
+                    except ValueError as e:
+                        return PrimitiveResult(
+                            light_id=light_id, success=False, error=f"Invalid color '{self.color}': {e}"
+                        )
 
             # Add transition time
             state_update["transition_time"] = self.transition_ms

@@ -1,0 +1,57 @@
+# Focus Mode - Ambient breathing for deep work
+#
+# A subtle, non-distracting breathing effect that provides
+# ambient awareness without demanding attention. Perfect for:
+# - Pomodoro work sessions
+# - Background "I'm working" indicator
+# - Meditation/focus time
+#
+# Usage: huesignal run examples/focus-mode.yaml
+
+name: focus-mode
+description: Subtle breathing effect for deep concentration
+
+tracks:
+  - light: PC
+    steps:
+      # Initial state: calm blue
+      - set:
+          on: true
+          brightness: 80
+          color: working
+          transition_ms: 500
+      - wait: 500
+      
+      # Long, slow breathing cycles
+      # Each cycle: 8 seconds (4s in, 4s out)
+      # Repeated 4 times = 32 seconds total
+      
+      - effect: breathe
+        options:
+          color: working
+          brightness: 120
+        duration_ms: 8000
+      
+      - effect: breathe
+        options:
+          color: "#4169E1"
+          brightness: 100
+        duration_ms: 8000
+      
+      - effect: breathe
+        options:
+          color: working
+          brightness: 120
+        duration_ms: 8000
+      
+      - effect: breathe
+        options:
+          color: "#4169E1"
+          brightness: 100
+        duration_ms: 8000
+      
+      # Settle to steady state
+      - set:
+          brightness: 90
+          color: working
+          transition_ms: 1000

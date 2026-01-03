@@ -1,0 +1,99 @@
+# Meeting Countdown - Progressive urgency timer
+#
+# Visual reminder as a meeting approaches:
+# - Starts calm and low
+# - Gradually increases brightness
+# - Color shifts from cool to warm
+# - Final minutes: attention-grabbing pulses
+#
+# Great for calendar integrations!
+#
+# Usage: huesignal run examples/meeting-countdown.yaml
+
+name: meeting-countdown
+description: Progressive urgency as meeting time approaches
+
+tracks:
+  - light: PC
+    steps:
+      # T-5 minutes: Subtle awareness (low blue)
+      - set:
+          on: true
+          brightness: 60
+          color: info
+          transition_ms: 500
+      - wait: 500
+      - effect: breathe
+        options:
+          color: info
+          brightness: 80
+        duration_ms: 4000
+      
+      # T-4 minutes: Slightly brighter cyan
+      - set:
+          brightness: 100
+          color: cyan
+          transition_ms: 1000
+      - wait: 1000
+      - effect: breathe
+        options:
+          color: cyan
+          brightness: 120
+        duration_ms: 3000
+      
+      # T-3 minutes: Green awareness
+      - set:
+          brightness: 130
+          color: "#32CD32"
+          transition_ms: 800
+      - wait: 800
+      - effect: pulse
+        options:
+          color: green
+          count: 1
+        duration_ms: 1000
+      - wait: 1200
+      
+      # T-2 minutes: Yellow caution
+      - set:
+          brightness: 160
+          color: yellow
+          transition_ms: 600
+      - wait: 600
+      - effect: pulse
+        options:
+          color: yellow
+          count: 2
+        duration_ms: 1400
+      
+      # T-1 minute: Orange urgency
+      - set:
+          brightness: 200
+          color: warning
+          transition_ms: 500
+      - wait: 500
+      - effect: blink
+        options:
+          color: warning
+          count: 3
+        duration_ms: 1200
+      
+      # T-30 seconds: Red alert
+      - effect: blink
+        options:
+          color: error
+          brightness: 254
+          count: 4
+        duration_ms: 1600
+      
+      # Meeting time! Sustained red
+      - set:
+          brightness: 254
+          color: error
+          transition_ms: 300
+      - wait: 300
+      - effect: pulse
+        options:
+          color: error
+          count: 2
+        duration_ms: 1000

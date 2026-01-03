@@ -1,0 +1,67 @@
+# Alert Cascade - Urgent attention sequence
+#
+# A dramatic alert sequence for critical events:
+# - System errors
+# - Production incidents
+# - Important notifications requiring immediate attention
+#
+# The red blinking is impossible to ignore!
+#
+# Usage: huesignal run examples/alert-cascade.yaml
+
+name: alert-cascade
+description: Attention-grabbing alert sequence for critical events
+
+tracks:
+  - light: PC
+    steps:
+      # Phase 1: Warning buildup - orange pulses
+      - set:
+          on: true
+          brightness: 200
+          color: warning
+          transition_ms: 200
+      - wait: 200
+      - effect: pulse
+        options:
+          color: warning
+          count: 2
+        duration_ms: 800
+      
+      # Phase 2: Escalation - faster, brighter
+      - effect: blink
+        options:
+          color: warning
+          brightness: 230
+          count: 3
+        duration_ms: 900
+      
+      # Phase 3: Critical - red alert
+      - effect: blink
+        options:
+          color: error
+          brightness: 254
+          count: 5
+        duration_ms: 1500
+      
+      # Phase 4: Sustained attention
+      - effect: pulse
+        options:
+          color: error
+          brightness: 254
+          count: 3
+        duration_ms: 1200
+      
+      # Phase 5: Settle to warning state (still needs attention)
+      - set:
+          brightness: 180
+          color: error
+          transition_ms: 500
+      - wait: 500
+      
+      # Gentle reminder pulse
+      - effect: breathe
+        options:
+          color: error
+          brightness: 180
+        duration_ms: 3000

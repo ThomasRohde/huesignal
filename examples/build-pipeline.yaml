@@ -1,0 +1,78 @@
+# Build Pipeline - CI/CD stage visualization
+#
+# Visual feedback for multi-stage build processes.
+# Each color represents a different pipeline stage:
+# - Blue: Starting/initializing
+# - Cyan: Building/compiling
+# - Yellow: Testing
+# - Purple: Deploying
+# - Green: Success!
+#
+# Usage: huesignal run examples/build-pipeline.yaml
+
+name: build-pipeline
+description: Visual CI/CD pipeline stage progression
+
+tracks:
+  - light: PC
+    steps:
+      # Stage 1: Initialization - Blue pulse
+      - set:
+          on: true
+          brightness: 150
+          color: info
+          transition_ms: 300
+      - wait: 300
+      - effect: pulse
+        options:
+          color: info
+          count: 2
+        duration_ms: 1000
+      
+      # Stage 2: Building - Cyan steady glow
+      - set:
+          brightness: 180
+          color: cyan
+          transition_ms: 500
+      - wait: 500
+      - effect: breathe
+        options:
+          color: cyan
+        duration_ms: 2000
+      
+      # Stage 3: Testing - Yellow activity
+      - set:
+          brightness: 200
+          color: yellow
+          transition_ms: 400
+      - wait: 400
+      - effect: pulse
+        options:
+          color: yellow
+          count: 3
+        duration_ms: 1500
+      
+      # Stage 4: Deploying - Purple transition
+      - set:
+          brightness: 180
+          color: purple
+          transition_ms: 500
+      - wait: 500
+      - effect: breathe
+        options:
+          color: purple
+        duration_ms: 2000
+      
+      # Stage 5: Success - Green celebration
+      - effect: pulse
+        options:
+          color: success
+          brightness: 254
+          count: 3
+        duration_ms: 1500
+      
+      # Final: Settle to success green
+      - set:
+          brightness: 200
+          color: success
+          transition_ms: 500

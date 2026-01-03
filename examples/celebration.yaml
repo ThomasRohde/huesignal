@@ -1,0 +1,36 @@
+# Celebration - Victory dance for completed milestones
+#
+# Use this program when something great happens:
+# - All tests pass
+# - Deployment successful
+# - Major feature complete
+#
+# Usage: huesignal run examples/celebration.yaml
+
+name: celebration
+description: A triumphant burst of color celebrating success
+
+tracks:
+  - light: PC
+    steps:
+      # Opening fanfare - three quick green pulses
+      - effect: pulse
+        options:
+          color: success
+          brightness: 254
+          count: 3
+        duration_ms: 1500
+      
+      # Brief pause to build anticipation
+      - wait: 200
+      
+      # The main event - full rainbow glory
+      - effect: rainbow
+        duration_ms: 5000
+      
+      # Settle to warm golden glow
+      - set:
+          on: true
+          brightness: 200
+          color: celebration
+          transition_ms: 800
