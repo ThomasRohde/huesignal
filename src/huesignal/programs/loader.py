@@ -61,13 +61,31 @@ def load_program(path: str | Path) -> Program:
 
     # Validate required top-level fields
     if not isinstance(data, dict):
-        raise ValueError("YAML root must be a dictionary")
+        raise ValueError(
+            "YAML root must be a dictionary.\n"
+            "Expected format:\n"
+            "  name: my-program\n"
+            "  tracks: [...]\n"
+            "\nUse 'huesignal program format' for complete reference."
+        )
 
     if "name" not in data:
-        raise ValueError("Missing required field: 'name'")
+        raise ValueError(
+            "Missing required field: 'name'\n"
+            "Add a program name at the top of your YAML file:\n"
+            "  name: my-program\n"
+            "\nUse 'huesignal program template notification' for a starter template."
+        )
 
     if "tracks" not in data:
-        raise ValueError("Missing required field: 'tracks'")
+        raise ValueError(
+            "Missing required field: 'tracks'\n"
+            "Add at least one track definition:\n"
+            "  tracks:\n"
+            "    - light: desk-light\n"
+            "      steps: [...]\n"
+            "\nUse 'huesignal program template notification' for a starter template."
+        )
 
     # Parse program
     name: str = data["name"]  # type: ignore[assignment]
@@ -111,17 +129,42 @@ def _parse_track(data: Any) -> LightTrack:
         ValueError: If track data is invalid
     """
     if not isinstance(data, dict):
-        raise ValueError("Track must be a dictionary")
+        raise ValueError(
+            "Track must be a dictionary.\n"
+            "Expected format:\n"
+            "  - light: desk-light\n"
+            "    steps: [...]\n"
+            "\nUse 'huesignal program format' for complete reference."
+        )
 
     if "light" not in data:
-        raise ValueError("Track missing required field: 'light'")
+        raise ValueError(
+            "Track missing required field: 'light'\n"
+            "Specify which light this track controls:\n"
+            "  - light: desk-light\n"
+            "    steps: [...]\n"
+            "\nUse 'huesignal lights list' to see available light names."
+        )
 
     light_pattern: str = data["light"]  # type: ignore[assignment]
     if not isinstance(light_pattern, str):
-        raise ValueError("Field 'light' must be a string")
+        raise ValueError(
+            "Field 'light' must be a string (light name).\n"
+            "Example:\n"
+            "  light: desk-light\n"
+            "\nUse 'huesignal lights list' to see available names."
+        )
 
     if "steps" not in data:
-        raise ValueError("Track missing required field: 'steps'")
+        raise ValueError(
+            "Track missing required field: 'steps'\n"
+            "Add a list of steps for this track:\n"
+            "  steps:\n"
+            "    - effect: pulse\n"
+            "      options:\n"
+            "        color: green\n"
+            "\nUse 'huesignal program format' for all step types."
+        )
 
     steps_data: list[Any] = data["steps"]  # type: ignore[assignment]
     if not isinstance(steps_data, list):
@@ -196,7 +239,24 @@ def _parse_step(data: Any, current_time_ms: int) -> tuple[TimelineStep, int]:
     elif "set" in data:
         action, duration = _parse_set_action(data)  # type: ignore[arg-type]
     else:
-        raise ValueError("Step must have one of: 'effect', 'wait', or 'set'")
+        raise ValueError(
+            "Step must have one of: 'effect', 'wait', or 'set'\n"
+            "\n"
+            "Effect step:\n"
+            "  - effect: pulse\n"
+            "    options:\n"
+            "      color: green\n"
+            "\n"
+            "Wait step:\n"
+            "  - wait: 500\n"
+            "\n"
+            "Set step:\n"
+            "  - set:\n"
+            "      on: true\n"
+            "      brightness: 200\n"
+            "\n"
+            "Use 'huesignal program format' for complete reference."
+        )
 
     # Get explicit duration if provided (overrides inferred duration)
     if "duration_ms" in data:
@@ -238,7 +298,20 @@ def _parse_effect_action(data: dict[str, Any]) -> tuple[EffectAction, int]:
     # Validate effect name against registry
     effect_class = get_effect_class(effect_name)
     if effect_class is None:
-        raise ValueError(f"Unknown effect name: '{effect_name}'. Effect not found in registry.")
+        raise ValueError(
+            f"Unknown effect name: '{effect_name}'\n"
+            "\n"
+            "Available effects: pulse, breathe, blink, rainbow\n"
+            "\n"
+            "Example:\n"
+            "  - effect: pulse\n"
+            "    options:\n"
+            "      color: green\n"
+            "      brightness: 0.8\n"
+            "\n"
+            "Use 'huesignal effect list' to see all effects.\n"
+            "Use 'huesignal effect params <name>' for effect-specific parameters."
+        )
 
     # Parse effect options/parameters
     parameters: dict[str, Any] = data.get("options", {})  # type: ignore[assignment]
@@ -264,7 +337,15 @@ def _parse_wait_action(data: dict[str, Any]) -> tuple[WaitAction, int]:
     """
     wait_ms = data["wait"]
     if not isinstance(wait_ms, int) or wait_ms < 0:
-        raise ValueError("Field 'wait' must be a non-negative integer (milliseconds)")
+        raise ValueError(
+            "Field 'wait' must be a non-negative integer (milliseconds)\n"
+            "\n"
+            "Example:\n"
+            "  - wait: 500     # Pause for 500 milliseconds\n"
+            "  - wait: 1000    # Pause for 1 second\n"
+            "\n"
+            "Typical range: 100-2000ms"
+        )
 
     action = WaitAction(duration_ms=wait_ms)
     return action, wait_ms
@@ -297,7 +378,16 @@ def _parse_set_action(data: dict[str, Any]) -> tuple[SetAction, int]:
         raise ValueError("Field 'on' must be a boolean")
 
     if brightness is not None and (not isinstance(brightness, int) or brightness < 1 or brightness > 254):
-        raise ValueError("Field 'brightness' must be an integer between 1 and 254")
+        raise ValueError(
+            "Field 'brightness' must be an integer between 1 and 254\n"
+            "\n"
+            "Example:\n"
+            "  set:\n"
+            "    brightness: 127  # Half brightness (1-254 range)\n"
+            "    brightness: 200  # ~80% brightness\n"
+            "\n"
+            "Use 'huesignal effect info' for brightness format reference."
+        )
 
     if color is not None and not isinstance(color, (str, list)):
         raise ValueError("Field 'color' must be a string (hex/name) or list [x, y]")

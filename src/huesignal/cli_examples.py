@@ -164,8 +164,65 @@ EXPLAIN_TEXT = r"""
 │   huesignal samples show lodestar-agent                                       │
 │   huesignal samples show pytest-conftest                                      │
 │                                                                               │
+│ Save sample to file:                                                          │
+│   huesignal samples show lodestar-agent --save agent.sh                       │
+│                                                                               │
 │ All samples use cached config - no manual IPs needed!                        │
 │ Set HUESIGNAL_LIGHT_NAME environment variable for your default light.        │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ YAML PROGRAMS (Multi-Light Choreography) ───────────────────────────────────┐
+│ Learn YAML program format:                                                    │
+│   huesignal program format                                                    │
+│                                                                               │
+│ Generate starter templates:                                                   │
+│   huesignal program template notification                                     │
+│   huesignal program template sequence --output my-program.yaml                │
+│   huesignal program template parallel                                         │
+│   huesignal program template choreography                                     │
+│                                                                               │
+│ Execute YAML programs:                                                        │
+│   huesignal run celebration.yaml                                              │
+│   huesignal run examples/sunrise-wakeup.yaml                                  │
+│                                                                               │
+│ Validate before running:                                                      │
+│   huesignal run my-program.yaml --validate                                    │
+│                                                                               │
+│ YAML programs enable:                                                         │
+│   - Multi-light synchronization                                               │
+│   - Precise timing and sequencing                                             │
+│   - Parallel effect execution                                                 │
+│   - Complex choreography                                                      │
+│                                                                               │
+│ Quick YAML example:                                                           │
+│   name: notification                                                          │
+│   tracks:                                                                     │
+│     - light: desk-light                                                       │
+│       steps:                                                                  │
+│         - effect: pulse                                                       │
+│           options:                                                            │
+│             color: green                                                      │
+│             brightness: 0.8                                                   │
+│         - wait: 500                                                           │
+│         - effect: breathe                                                     │
+│           options:                                                            │
+│             color: blue                                                       │
+│                                                                               │
+│ See examples/ directory for more patterns!                                    │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ EFFECT DISCOVERY ───────────────────────────────────────────────────────────┐
+│ See all valid colors, brightness formats, and timing:                        │
+│   huesignal effect info                                                       │
+│                                                                               │
+│ List all available effects:                                                   │
+│   huesignal effect list                                                       │
+│                                                                               │
+│ See parameters for a specific effect:                                        │
+│   huesignal effect params pulse                                               │
+│   huesignal effect params blink                                               │
+│                                                                               │
+│ This shows valid parameter values so you don't have to guess!                │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌─ GLOBAL OPTIONS ─────────────────────────────────────────────────────────────┐

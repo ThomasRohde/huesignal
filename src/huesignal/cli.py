@@ -24,10 +24,18 @@ app = typer.Typer(
     Use huesignal to control Hue lights for status signals, notifications, and effects.
     Perfect for coding agents to provide visual feedback on task status.
     
-    Quick Start:
-      huesignal auth login              # First time setup
+    Quick Start (first time):
+      huesignal --getting-started       # Interactive setup wizard
+      
+    Or manual setup:
+      huesignal auth login              # Authenticate with bridge
       huesignal lights list             # Discover your lights
       huesignal effect apply pulse -l desk-light -c green -b 100  # Signal success
+    
+    Discovery commands:
+      huesignal effect info             # Valid colors, brightness formats, timing
+      huesignal program format          # YAML program syntax reference
+      huesignal program template notification  # Generate starter YAML
     
     For detailed examples: huesignal --explain
     """,
@@ -55,6 +63,171 @@ def explain_callback(value: bool) -> None:
     if value:
         typer.echo(EXPLAIN_TEXT)
         raise typer.Exit()
+
+
+def getting_started_callback(value: bool) -> None:
+    """Launch interactive getting started wizard and exit."""
+    if value:
+        run_getting_started_wizard()
+        raise typer.Exit()
+
+
+def run_getting_started_wizard() -> None:
+    """Interactive wizard for first-time users."""
+    typer.secho("\n╔═══════════════════════════════════════════════╗", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.secho("║   Welcome to huesignal! 🎉                  ║", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.secho("║   Interactive Setup Wizard                    ║", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.secho("╚═══════════════════════════════════════════════╝\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+
+    typer.echo("This wizard will help you:")
+    typer.echo("  1. Connect to your Philips Hue bridge")
+    typer.echo("  2. Discover your lights")
+    typer.echo("  3. Try your first effect")
+    typer.echo()
+
+    # Step 1: Check if already authenticated
+    typer.secho("Step 1: Bridge Authentication", fg=typer.colors.YELLOW, bold=True)
+    typer.echo("─" * 50)
+
+    cached_ip = get_default_bridge_ip()
+    app_key = None
+
+    if cached_ip:
+        typer.secho(f"✓ Found cached bridge: {cached_ip}", fg=typer.colors.GREEN)
+        # Try to get app key
+        try:
+            app_key = get_app_key(cached_ip)
+            typer.secho(f"✓ Found stored credentials for {cached_ip}", fg=typer.colors.GREEN)
+        except AuthError:
+            typer.secho("⚠ No credentials found. Need to authenticate.", fg=typer.colors.YELLOW)
+    else:
+        typer.echo("No bridge configured yet.")
+
+    if not app_key:
+        typer.echo()
+        if typer.confirm("Would you like to authenticate now?", default=True):
+            typer.echo()
+            typer.echo("Press the LINK BUTTON on your Hue bridge, then press Enter...")
+            input()
+
+            try:
+                # Discover bridge
+                typer.echo("Discovering bridge...")
+                bridges = asyncio.run(discover_bridges())
+                if not bridges:
+                    bridges = asyncio.run(discover_bridges_mdns(timeout=3.0))
+
+                if not bridges:
+                    typer.secho("✗ No bridges found. Check network connection.", fg=typer.colors.RED)
+                    typer.echo()
+                    typer.echo("Manual setup:")
+                    typer.echo("  huesignal auth login --bridge-ip YOUR_BRIDGE_IP")
+                    return
+
+                bridge_ip = bridges[0][0]
+                typer.secho(f"✓ Found bridge: {bridge_ip}", fg=typer.colors.GREEN)
+
+                # Authenticate
+                typer.echo("Requesting credentials (30s timeout)...")
+                app_key = asyncio.run(auth_login(bridge_ip, timeout=30))
+                store_app_key(bridge_ip, app_key)
+                set_default_bridge_ip(bridge_ip)
+
+                typer.secho("✓ Authentication successful!", fg=typer.colors.GREEN)
+                cached_ip = bridge_ip
+
+            except Exception as e:
+                typer.secho(f"✗ Authentication failed: {e}", fg=typer.colors.RED)
+                typer.echo()
+                typer.echo("Try manual authentication:")
+                typer.echo("  huesignal auth login")
+                return
+        else:
+            typer.echo()
+            typer.echo("Skipping authentication. Run this when ready:")
+            typer.echo("  huesignal auth login")
+            return
+
+    # Step 2: Discover lights
+    typer.echo()
+    typer.secho("Step 2: Discover Lights", fg=typer.colors.YELLOW, bold=True)
+    typer.echo("─" * 50)
+
+    try:
+
+        async def get_lights():
+            async with HueClient(cached_ip, app_key) as client:
+                lights_data = await list_lights(client.bridge)
+                return lights_data
+
+        lights = asyncio.run(get_lights())
+
+        if lights:
+            typer.secho(f"✓ Found {len(lights)} light(s):", fg=typer.colors.GREEN)
+            for light in lights[:5]:  # Show first 5
+                typer.echo(f"  • {light['name']}")
+            if len(lights) > 5:
+                typer.echo(f"  ... and {len(lights) - 5} more")
+        else:
+            typer.secho("⚠ No lights found", fg=typer.colors.YELLOW)
+
+    except Exception as e:
+        typer.secho(f"✗ Could not list lights: {e}", fg=typer.colors.RED)
+        lights = []
+
+    # Step 3: Try first effect
+    if lights:
+        typer.echo()
+        typer.secho("Step 3: Try Your First Effect", fg=typer.colors.YELLOW, bold=True)
+        typer.echo("─" * 50)
+
+        # Get first light name
+        first_light = lights[0]["name"]
+        typer.echo(f"Let's send a green success pulse to '{first_light}'")
+
+        if typer.confirm("Ready to see it in action?", default=True):
+            try:
+                from huesignal.effects import EffectOptions, Pulse
+                from huesignal.resolver import resolve_lights
+
+                async def run_demo_effect():
+                    async with HueClient(cached_ip, app_key) as client:
+                        resolved = await resolve_lights(client.bridge, light_names=[first_light])
+                        light_ids = [r.light_id for r in resolved]
+
+                        effect = Pulse(
+                            client.bridge,
+                            light_ids,
+                            EffectOptions(duration_ms=1000, color="green", brightness=0.8, restore=True),
+                        )
+                        await effect.apply()
+
+                typer.echo("Applying effect...")
+                asyncio.run(run_demo_effect())
+                typer.secho("✓ Effect complete! Did you see it?", fg=typer.colors.GREEN)
+
+            except Exception as e:
+                typer.secho(f"✗ Effect failed: {e}", fg=typer.colors.RED)
+
+    # Final summary
+    typer.echo()
+    typer.secho("═" * 50, fg=typer.colors.BRIGHT_CYAN)
+    typer.secho("🎓 Setup Complete! Next Steps:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+    typer.secho("═" * 50, fg=typer.colors.BRIGHT_CYAN)
+    typer.echo()
+    typer.echo("Quick commands to try:")
+    typer.echo("  huesignal effect apply pulse -c green -b 0.7")
+    typer.echo("  huesignal effect apply blink -c red --count 3")
+    typer.echo("  huesignal effect info              # See all colors & formats")
+    typer.echo()
+    typer.echo("Learn YAML programs:")
+    typer.echo("  huesignal program format           # Complete YAML reference")
+    typer.echo("  huesignal program template notification")
+    typer.echo("  huesignal run examples/celebration.yaml")
+    typer.echo()
+    typer.echo("Full documentation:")
+    typer.echo("  huesignal --explain                # Comprehensive examples")
+    typer.echo()
 
 
 class GlobalOptions:
@@ -144,6 +317,13 @@ def main(
         is_eager=True,
         help="Show comprehensive usage examples and patterns for coding agents",
     ),
+    getting_started: bool = typer.Option(
+        False,
+        "--getting-started",
+        callback=getting_started_callback,
+        is_eager=True,
+        help="Launch interactive setup wizard for first-time users",
+    ),
     bridge_ip: str | None = bridge_ip,
     verbose: bool = verbose,
     quiet: bool = quiet,
@@ -161,6 +341,7 @@ def main(
       - Task complete:   huesignal effect apply pulse -l desk-light -c green -b 0.7
       - Error/blocker:   huesignal effect apply blink -l desk-light -c red --count 3
 
+    First time user? Run: huesignal --getting-started
     For thorough examples and patterns, run: huesignal --explain
     """
     # Set up logging
@@ -221,6 +402,13 @@ samples_app = typer.Typer(
 
 Pre-built templates for common automation scenarios (CI/CD, GitHub Actions, etc.).
 Use 'huesignal samples list' to see available templates."""
+)
+
+program_app = typer.Typer(
+    help="""YAML program documentation and utilities.
+
+Learn YAML format, generate templates, and preview program structures.
+Use these commands to understand how to create multi-light choreography programs."""
 )
 
 cache_app = typer.Typer(
@@ -731,6 +919,152 @@ def effect_params(
             typer.echo()
 
 
+@effect_app.command(name="info")
+def effect_info(ctx: typer.Context) -> None:
+    """Show comprehensive reference for colors, brightness formats, and timing.
+
+    Use this command to discover all valid parameter values before creating effects or programs.
+
+    Displays:
+      - All valid color names (with semantic aliases for agent workflows)
+      - Brightness format options (percentage, decimal, raw)
+      - Timing parameter ranges and recommendations
+      - Common use cases and examples
+
+    Examples:
+      huesignal effect info
+      huesignal effect info --json
+    """
+    from huesignal.effects.colors import COLOR_NAMES
+
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    if opts.json_output:
+        import json
+
+        color_info = {
+            name: {
+                "rgb": rgb,
+                "category": "semantic"
+                if name in ["success", "error", "warning", "info", "working", "celebration"]
+                else "standard",
+            }
+            for name, rgb in COLOR_NAMES.items()
+        }
+
+        reference = {
+            "colors": color_info,
+            "brightness_formats": {
+                "percentage": {
+                    "range": "0-100",
+                    "example": "75",
+                    "description": "Percentage notation (75 = 75% brightness)",
+                },
+                "decimal": {
+                    "range": "0.0-1.0",
+                    "example": "0.75",
+                    "description": "Decimal notation (0.75 = 75% brightness)",
+                },
+                "raw": {"range": "1-254", "example": "191", "description": "Philips Hue API raw values"},
+            },
+            "timing": {
+                "duration_ms": {
+                    "min": 0,
+                    "typical": 1000,
+                    "max": None,
+                    "description": "Effect duration in milliseconds",
+                },
+                "wait": {"min": 0, "typical": 500, "description": "Pause duration in milliseconds for program steps"},
+                "transition_ms": {
+                    "min": 0,
+                    "typical": 400,
+                    "max": 65535,
+                    "description": "Smooth transition time for state changes",
+                },
+            },
+            "common_patterns": {
+                "quick_notification": {"effect": "pulse", "duration": 1000, "brightness": 0.8},
+                "error_alert": {"effect": "blink", "color": "red", "count": 3},
+                "success_signal": {"effect": "pulse", "color": "green", "brightness": 0.7},
+                "working_indicator": {"effect": "breathe", "color": "blue", "duration": 2000},
+            },
+        }
+        typer.echo(json.dumps(reference, indent=2))
+    else:
+        # Formatted terminal output
+        typer.secho("\n═══ HUESIGNAL EFFECT REFERENCE ═══\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+
+        # Color names section
+        typer.secho("📋 VALID COLOR NAMES:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.echo()
+
+        # Semantic colors for agents
+        typer.secho("  Agent Workflow Colors (semantic):", fg=typer.colors.BRIGHT_GREEN)
+        semantic_colors = ["success", "error", "warning", "info", "working", "celebration"]
+        for color_name in semantic_colors:
+            rgb = COLOR_NAMES[color_name]
+            typer.echo(f"    {color_name:<20} RGB{rgb}")
+
+        typer.echo()
+        typer.secho("  Standard Colors:", fg=typer.colors.BRIGHT_GREEN)
+        standard_colors = [name for name in sorted(COLOR_NAMES.keys()) if name not in semantic_colors]
+        for i in range(0, len(standard_colors), 3):
+            row = standard_colors[i : i + 3]
+            formatted = "    " + "".join(f"{name:<20}" for name in row)
+            typer.echo(formatted)
+
+        typer.echo()
+        typer.secho("  Hex Colors:", fg=typer.colors.BRIGHT_GREEN)
+        typer.echo("    Format: #RRGGBB (e.g., #FF0000 for red, #00FF00 for green)")
+
+        # Brightness section
+        typer.echo()
+        typer.secho("💡 BRIGHTNESS FORMATS:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.echo()
+        typer.echo("    Percentage:  0-100      (e.g., 75 = 75% brightness)")
+        typer.echo("    Decimal:     0.0-1.0    (e.g., 0.75 = 75% brightness)")
+        typer.echo("    Raw:         1-254      (Philips Hue API values)")
+        typer.echo()
+        typer.echo("    Examples:")
+        typer.echo("      --brightness 80       → 80% brightness")
+        typer.echo("      --brightness 0.5      → 50% brightness")
+        typer.echo("      --brightness 127      → 50% brightness (raw)")
+
+        # Timing section
+        typer.echo()
+        typer.secho("⏱️  TIMING PARAMETERS:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.echo()
+        typer.echo("    duration_ms:    Effect duration (default: 1000ms)")
+        typer.echo("                    Typical range: 500-5000ms")
+        typer.echo()
+        typer.echo("    wait:           Pause between steps (program YAML only)")
+        typer.echo("                    Typical range: 100-2000ms")
+        typer.echo()
+        typer.echo("    transition_ms:  Smooth transition time (set actions)")
+        typer.echo("                    Range: 0-65535ms, typical: 400ms")
+
+        # Common patterns section
+        typer.echo()
+        typer.secho("🎯 COMMON PATTERNS:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.echo()
+        typer.echo("    Quick notification:")
+        typer.echo("      huesignal effect apply pulse -c green -b 0.8")
+        typer.echo()
+        typer.echo("    Error alert:")
+        typer.echo("      huesignal effect apply blink -c red --count 3")
+        typer.echo()
+        typer.echo("    Success signal:")
+        typer.echo("      huesignal effect apply pulse -c success -b 0.7")
+        typer.echo()
+        typer.echo("    Working indicator:")
+        typer.echo("      huesignal effect apply breathe -c working -d 2000")
+        typer.echo()
+        typer.secho(
+            "💡 Tip: Use 'huesignal effect params <effect>' to see effect-specific parameters\n", fg=typer.colors.CYAN
+        )
+
+
 @effect_app.command()
 def apply(
     ctx: typer.Context,
@@ -996,7 +1330,8 @@ def play(
     """Execute a YAML effect program.
 
     Programs enable multi-light choreography with sequenced effects.
-    See EFFECTS_PRD.md for YAML format documentation.
+    Use 'huesignal program format' for YAML syntax reference.
+    Use 'huesignal program template' to generate starter files.
 
     Example:
         huesignal effect play celebration.yaml
@@ -1213,6 +1548,372 @@ def play(
         raise typer.Exit(1)
 
 
+@program_app.command()
+def format(ctx: typer.Context) -> None:
+    """Show complete YAML program format reference.
+
+    Display the full YAML schema for creating multi-light choreography programs.
+    Use this to learn how to write programs without guessing syntax.
+
+    Covers:
+      - Program structure (name, description, tracks)
+      - Step types (effect, wait, set)
+      - Parallel execution with start_ms
+      - All available fields and their types
+      - Complete working examples
+
+    Examples:
+      huesignal program format
+      huesignal program format --json
+    """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    if opts.json_output:
+        import json
+
+        schema = {
+            "program_structure": {
+                "name": {"type": "string", "required": True, "description": "Program name"},
+                "description": {"type": "string", "required": False, "description": "Human-readable description"},
+                "tracks": {"type": "array", "required": True, "description": "List of parallel light tracks"},
+            },
+            "track_structure": {
+                "light": {"type": "string", "required": True, "description": "Light name pattern"},
+                "steps": {"type": "array", "required": True, "description": "Sequence of timed steps"},
+            },
+            "step_types": {
+                "effect_step": {
+                    "effect": {
+                        "type": "string",
+                        "required": True,
+                        "description": "Effect name (pulse, breathe, blink, rainbow)",
+                    },
+                    "options": {"type": "object", "required": False, "description": "Effect parameters"},
+                    "duration_ms": {"type": "integer", "required": False, "description": "Override effect duration"},
+                    "start_ms": {
+                        "type": "integer",
+                        "required": False,
+                        "description": "Explicit start time for parallel execution",
+                    },
+                },
+                "wait_step": {
+                    "wait": {"type": "integer", "required": True, "description": "Pause duration in milliseconds"},
+                    "start_ms": {
+                        "type": "integer",
+                        "required": False,
+                        "description": "Explicit start time for parallel execution",
+                    },
+                },
+                "set_step": {
+                    "set": {"type": "object", "required": True, "description": "State to set"},
+                    "set.on": {"type": "boolean", "required": False, "description": "Power state"},
+                    "set.brightness": {"type": "integer", "required": False, "description": "Brightness 1-254"},
+                    "set.color": {
+                        "type": "string | [float, float]",
+                        "required": False,
+                        "description": "Color name/hex or [x,y]",
+                    },
+                    "set.transition_ms": {"type": "integer", "required": False, "description": "Transition time"},
+                    "start_ms": {"type": "integer", "required": False, "description": "Explicit start time"},
+                },
+            },
+            "parallel_execution": {
+                "description": "Use start_ms to run steps in parallel",
+                "example": "Two effects at start_ms: 0 run simultaneously",
+            },
+        }
+        typer.echo(json.dumps(schema, indent=2))
+    else:
+        typer.secho("\n═══ YAML PROGRAM FORMAT REFERENCE ═══\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+
+        # Program structure
+        typer.secho("📋 PROGRAM STRUCTURE:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.echo(
+            """\nname: my-program           # Required: program name
+description: What it does  # Optional: human-readable description
+tracks:                    # Required: list of light tracks (parallel execution)
+  - light: light-name      # Each track targets one or more lights
+    steps: [...]           # Sequence of timed steps
+"""
+        )
+
+        # Step types
+        typer.secho("\n🎯 STEP TYPES:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+
+        typer.secho("\n  1. Effect Step", fg=typer.colors.BRIGHT_GREEN)
+        typer.echo(
+            """     Apply a visual effect
+
+     - effect: pulse        # Effect name (pulse, breathe, blink, rainbow)
+       options:             # Optional: effect-specific parameters
+         color: green
+         brightness: 0.8
+         count: 2
+       duration_ms: 2000    # Optional: override effect duration
+"""
+        )
+
+        typer.secho("  2. Wait Step", fg=typer.colors.BRIGHT_GREEN)
+        typer.echo(
+            """     Pause between effects
+
+     - wait: 500            # Pause duration in milliseconds
+"""
+        )
+
+        typer.secho("  3. Set Step", fg=typer.colors.BRIGHT_GREEN)
+        typer.echo(
+            """     Set light state directly
+
+     - set:
+         on: true           # Optional: power state
+         brightness: 200    # Optional: 1-254
+         color: "#FF0000"  # Optional: color name/hex or [x, y]
+         transition_ms: 400 # Optional: smooth transition time
+"""
+        )
+
+        # Parallel execution
+        typer.secho("\n⚡ PARALLEL EXECUTION:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.echo(
+            """\nUse start_ms to run steps simultaneously within a track:
+
+steps:
+  - start_ms: 0          # Starts at time 0
+    effect: pulse
+    duration_ms: 2000
+  - start_ms: 0          # ALSO starts at time 0 (runs in parallel!)
+    effect: breathe
+    duration_ms: 2000
+  - effect: rainbow      # Starts after parallel steps finish
+    duration_ms: 1000
+"""
+        )
+
+        # Complete example
+        typer.secho("\n📝 COMPLETE EXAMPLE:", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.echo(
+            """\nname: celebration
+description: Success celebration sequence
+
+tracks:
+  - light: desk-light
+    steps:
+      - effect: pulse
+        options:
+          color: green
+          brightness: 0.8
+        duration_ms: 1000
+      - wait: 500
+      - effect: rainbow
+        duration_ms: 2000
+        
+  - light: room-light    # Second track runs in parallel
+    steps:
+      - wait: 500          # Slight delay for variation
+      - effect: breathe
+        options:
+          color: blue
+        duration_ms: 2500
+"""
+        )
+
+        typer.secho("\n💡 Tips:", fg=typer.colors.CYAN)
+        typer.echo("  • Use 'huesignal program template' to generate starter files")
+        typer.echo("  • Use 'huesignal effect info' for valid color/brightness values")
+        typer.echo("  • Use 'huesignal run <file> --validate' to check syntax")
+        typer.echo("  • Check examples/ directory for more patterns\n")
+
+
+@program_app.command()
+def template(
+    ctx: typer.Context,
+    template_type: str = typer.Argument(
+        "notification", help="Template type: notification, sequence, parallel, choreography"
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", help="Output file path (prints to stdout if omitted)"),
+) -> None:
+    """Generate YAML program templates.
+
+    Create ready-to-use starter files for common program patterns.
+    Templates include helpful comments explaining each field.
+
+    Template Types:
+      notification   - Simple single-light notification (quick start)
+      sequence       - Multi-step sequence on one light
+      parallel       - Multiple lights with parallel execution
+      choreography   - Complex multi-light choreography with timing
+
+    Examples:
+      huesignal program template notification
+      huesignal program template sequence --output my-program.yaml
+      huesignal program template parallel -o lights.yaml
+    """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    templates = {
+        "notification": """# Simple notification program
+# Quick single-light alert - perfect for getting started
+
+name: notification
+description: Quick notification flash
+
+tracks:
+  - light: desk-light    # Change to your light name
+    steps:
+      - effect: pulse
+        options:
+          color: green   # Color name or hex (#00FF00)
+          brightness: 0.8  # 0.0-1.0, or 1-254, or 0-100%
+        duration_ms: 1000
+""",
+        "sequence": """# Multi-step sequence program
+# Series of effects on one light with timing
+
+name: sequence
+description: Multi-step effect sequence
+
+tracks:
+  - light: desk-light    # Change to your light name
+    steps:
+      # Step 1: Initial pulse
+      - effect: pulse
+        options:
+          color: blue
+          brightness: 0.7
+        duration_ms: 1000
+      
+      # Step 2: Pause
+      - wait: 500
+      
+      # Step 3: Different effect
+      - effect: breathe
+        options:
+          color: purple
+          brightness: 0.6
+        duration_ms: 2000
+      
+      # Step 4: Final pulse
+      - wait: 300
+      - effect: pulse
+        options:
+          color: green
+          brightness: 0.8
+        duration_ms: 800
+""",
+        "parallel": """# Parallel multi-light program
+# Multiple lights executing simultaneously
+
+name: parallel
+description: Multi-light parallel execution
+
+tracks:
+  # Track 1: First light
+  - light: desk-light    # Change to your light name
+    steps:
+      - effect: pulse
+        options:
+          color: green
+          brightness: 0.8
+        duration_ms: 2000
+      - wait: 500
+      - effect: pulse
+        options:
+          color: green
+          brightness: 0.8
+        duration_ms: 1000
+  
+  # Track 2: Second light (runs in parallel with Track 1)
+  - light: room-light    # Change to your light name
+    steps:
+      - wait: 500          # Slight offset for variation
+      - effect: breathe
+        options:
+          color: blue
+          brightness: 0.7
+        duration_ms: 2500
+""",
+        "choreography": """# Advanced choreography program
+# Complex multi-light timing with parallel steps within tracks
+
+name: choreography
+description: Complex multi-light choreography demonstration
+
+tracks:
+  # Track 1: Main light with parallel effects
+  - light: desk-light
+    steps:
+      # Two effects starting simultaneously
+      - start_ms: 0        # Explicit start time enables parallelism
+        effect: pulse
+        options:
+          color: blue
+          brightness: 0.7
+        duration_ms: 2000
+      
+      - start_ms: 0        # Same start time = parallel execution
+        effect: breathe
+        options:
+          color: cyan
+          brightness: 0.5
+        duration_ms: 2000
+      
+      # Sequential step after parallel section
+      - wait: 500
+      
+      - effect: rainbow
+        duration_ms: 3000
+  
+  # Track 2: Accent light
+  - light: accent-light
+    steps:
+      - wait: 1000         # Delayed start
+      - effect: blink
+        options:
+          color: yellow
+          brightness: 0.9
+          count: 3
+        duration_ms: 1500
+  
+  # Track 3: Background light
+  - light: background-light
+    steps:
+      - effect: breathe
+        options:
+          color: purple
+          brightness: 0.4
+        duration_ms: 5000
+""",
+    }
+
+    if template_type not in templates:
+        typer.secho(
+            f"Error: Unknown template type '{template_type}'.\nAvailable: {', '.join(templates.keys())}",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    template_content = templates[template_type]
+
+    if output:
+        # Write to file
+        try:
+            from pathlib import Path
+
+            output_path = Path(output)
+            output_path.write_text(template_content, encoding="utf-8")
+            if not opts.quiet:
+                typer.secho(f"✓ Template written to: {output}", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"Error writing file: {e}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    else:
+        # Print to stdout
+        typer.echo(template_content)
+
+
 @samples_app.command(name="list")
 def samples_list(ctx: typer.Context) -> None:
     """List available automation samples."""
@@ -1234,26 +1935,100 @@ def samples_list(ctx: typer.Context) -> None:
 def samples_show(
     ctx: typer.Context,
     name: str = typer.Argument(..., help="Sample name to show"),
+    save: str | None = typer.Option(None, "--save", "-s", help="Save sample to file instead of printing"),
+    run: bool = typer.Option(
+        False, "--run", help="Execute sample directly (bash/PowerShell samples only, requires appropriate shell)"
+    ),
 ) -> None:
     """Show a sample automation template.
 
     All samples use cached huesignal configuration (bridge IP, light name).
     Set HUESIGNAL_LIGHT_NAME environment variable for default light.
 
+    Options:
+      --save/-s  Save sample to a file for later use
+      --run      Execute sample directly (USE WITH CAUTION)
+
     Args:
         name: Sample name to display
+
+    Examples:
+      huesignal samples show lodestar-agent
+      huesignal samples show pytest-conftest --save conftest.py
+      huesignal samples show coding-session-success --run
     """
     # Get global options from context
     opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
 
     try:
         sample = get_sample(name)
-        if opts.json_output:
+
+        if run:
+            # Execute sample directly
+            import subprocess
+            from pathlib import Path
+
+            # Determine shell based on sample content
+            if sample.startswith("# PowerShell") or sample.startswith("# pwsh"):
+                shell_cmd = ["pwsh", "-Command"]
+            elif sample.startswith("#!/bin/bash") or sample.startswith("# bash"):
+                shell_cmd = ["bash", "-c"]
+            elif sample.startswith("#!/usr/bin/env python"):
+                shell_cmd = ["python", "-c"]
+            else:
+                typer.secho(
+                    "Warning: Cannot determine shell type for this sample.\nDefaulting to PowerShell on Windows.",
+                    fg=typer.colors.YELLOW,
+                )
+                shell_cmd = ["pwsh", "-Command"]
+
+            try:
+                if not opts.quiet:
+                    typer.secho(f"Executing sample '{name}'...", fg=typer.colors.CYAN)
+
+                result = subprocess.run(shell_cmd + [sample], capture_output=True, text=True, timeout=30)
+
+                if result.stdout:
+                    typer.echo(result.stdout)
+                if result.stderr:
+                    typer.secho(result.stderr, fg=typer.colors.YELLOW, err=True)
+
+                if result.returncode != 0:
+                    raise typer.Exit(result.returncode)
+
+            except subprocess.TimeoutExpired:
+                typer.secho("Error: Sample execution timed out (30s limit)", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            except FileNotFoundError:
+                typer.secho(
+                    f"Error: Required shell not found: {shell_cmd[0]}\n"
+                    "Install the appropriate shell to run this sample.",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif save:
+            # Save to file
+            from pathlib import Path
+
+            try:
+                output_path = Path(save)
+                output_path.write_text(sample, encoding="utf-8")
+                if not opts.quiet:
+                    typer.secho(f"✓ Sample saved to: {save}", fg=typer.colors.GREEN)
+            except Exception as e:
+                typer.secho(f"Error writing file: {e}", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+        elif opts.json_output:
             import json
 
             typer.echo(json.dumps({"sample_name": name, "content": sample}, indent=2))
+
         else:
+            # Print to stdout
             typer.echo(sample)
+
     except ValueError as e:
         if opts.json_output:
             import json
@@ -1359,8 +2134,8 @@ def clear(ctx: typer.Context) -> None:
         typer.secho("Cache cleared successfully.", fg=typer.colors.GREEN)
 
 
-@cache_app.command()
-def info(ctx: typer.Context) -> None:
+@cache_app.command(name="info")
+def cache_info(ctx: typer.Context) -> None:
     """Show cache information.
 
     Displays cache location and statistics about cached data.
@@ -1506,6 +2281,7 @@ app.add_typer(auth_app, name="auth")
 app.add_typer(lights_app, name="lights")
 app.add_typer(effect_app, name="effect")
 app.add_typer(samples_app, name="samples")
+app.add_typer(program_app, name="program")
 app.add_typer(cache_app, name="cache")
 
 
