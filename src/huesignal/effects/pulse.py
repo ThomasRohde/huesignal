@@ -67,14 +67,15 @@ class Pulse(Effect):
 
         # Perform pulse cycles
         for _ in range(self.count):
-            # Pulse DOWN first (go dim/off)
+            # Pulse DOWN first (go dim with target color)
             for light_id in self.light_ids:
-                try:
-                    await self.bridge.lights.set_state(
-                        light_id, on=True, brightness=1, transition_time=self.interval_ms
-                    )
-                except Exception:
-                    pass
+                await self._set_light_state(
+                    light_id,
+                    on=True,
+                    brightness=1,
+                    color=self.options.color,
+                    transition_time=self.interval_ms,
+                )
 
             # Wait for transition to complete
             await asyncio.sleep((self.interval_ms / 1000.0) + 0.1)

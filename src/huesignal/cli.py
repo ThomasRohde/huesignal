@@ -233,6 +233,7 @@ Useful when bridge IP changes or experiencing connectivity issues."""
 
 @auth_app.command()
 def login(
+    ctx: typer.Context,
     bridge_ip: str | None = typer.Option(
         None, "--bridge-ip", help="IP address of Philips Hue bridge (auto-discovered if omitted)"
     ),
@@ -300,10 +301,28 @@ def login(
     # Start pairing process
     typer.echo(f"Press the link button on your Hue Bridge at {bridge_ip}...")
 
+    # Get global options from context if available
+    opts = getattr(ctx, "obj", None)
+    json_output = opts.json_output if isinstance(opts, GlobalOptions) else False
+
     try:
         app_key = asyncio.run(auth_login(bridge_ip, timeout=float(timeout)))
 
-        if print_key:
+        if json_output:
+            import json
+
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": True,
+                        "bridge_ip": bridge_ip,
+                        "app_key": app_key if print_key else "[stored]",
+                        "message": "Successfully authenticated",
+                    },
+                    indent=2,
+                )
+            )
+        elif print_key:
             # Just print the key
             typer.echo(app_key)
         else:
@@ -314,7 +333,12 @@ def login(
             typer.secho("Successfully authenticated and stored credentials!", fg=typer.colors.GREEN)
 
     except AuthError as e:
-        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
@@ -469,17 +493,45 @@ def lights_on_cmd(
             # Turn on using LightsController
             if brightness is not None:
                 await client.bridge.lights.set_state(light_id, on=True, brightness=brightness)
-                typer.secho(f"✓ Turned on '{light}' with brightness {brightness}", fg=typer.colors.GREEN)
+                if opts.json_output:
+                    import json
+
+                    typer.echo(
+                        json.dumps(
+                            {
+                                "success": True,
+                                "light": light,
+                                "light_id": light_id,
+                                "state": "on",
+                                "brightness": brightness,
+                            },
+                            indent=2,
+                        )
+                    )
+                else:
+                    typer.secho(f"✓ Turned on '{light}' with brightness {brightness}", fg=typer.colors.GREEN)
             else:
                 await client.bridge.lights.set_state(light_id, on=True)
-                typer.secho(f"✓ Turned on '{light}'", fg=typer.colors.GREEN)
+                if opts.json_output:
+                    import json
+
+                    typer.echo(
+                        json.dumps({"success": True, "light": light, "light_id": light_id, "state": "on"}, indent=2)
+                    )
+                else:
+                    typer.secho(f"✓ Turned on '{light}'", fg=typer.colors.GREEN)
 
     try:
         asyncio.run(turn_on())
     except Exception as e:
-        if opts.trace:
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        elif opts.trace:
             raise
-        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
@@ -520,14 +572,26 @@ def lights_off_cmd(
 
             # Turn off using LightsController
             await client.bridge.lights.set_state(light_id, on=False)
-            typer.secho(f"✓ Turned off '{light}'", fg=typer.colors.GREEN)
+            if opts.json_output:
+                import json
+
+                typer.echo(
+                    json.dumps({"success": True, "light": light, "light_id": light_id, "state": "off"}, indent=2)
+                )
+            else:
+                typer.secho(f"✓ Turned off '{light}'", fg=typer.colors.GREEN)
 
     try:
         asyncio.run(turn_off())
     except Exception as e:
-        if opts.trace:
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        elif opts.trace:
             raise
-        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
@@ -590,16 +654,25 @@ def show_light_cmd(
 
 
 @effect_app.command(name="list")
-def effect_list() -> None:
+def effect_list(ctx: typer.Context) -> None:
     """List available effects."""
-    effects = list_effects()
-    if not effects:
-        typer.echo("No effects registered.")
-        return
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
 
-    typer.echo("Available effects:")
-    for name, description in effects:
-        typer.echo(f"  {name:<25} {description}")
+    effects = list_effects()
+    if opts.json_output:
+        import json
+
+        effect_list = [{"name": name, "description": description} for name, description in effects]
+        typer.echo(json.dumps({"effects": effect_list, "count": len(effect_list)}, indent=2))
+    else:
+        if not effects:
+            typer.echo("No effects registered.")
+            return
+
+        typer.echo("Available effects:")
+        for name, description in effects:
+            typer.echo(f"  {name:<25} {description}")
 
 
 @effect_app.command()
@@ -760,14 +833,35 @@ def apply(
                     raise typer.Exit(1)
 
             # Create and apply effect
-            if effect_name == "pulse":
+            if effect_name in ("pulse", "blink"):
                 effect = effect_class(client.bridge, light_ids, effect_options, count=count)
             else:
                 effect = effect_class(client.bridge, light_ids, effect_options)
 
             failed_lights = await effect.apply()
 
-            if not opts.quiet:
+            if opts.json_output:
+                import json
+
+                typer.echo(
+                    json.dumps(
+                        {
+                            "success": len(failed_lights) == 0,
+                            "effect": effect_name,
+                            "lights_affected": len(light_ids),
+                            "light_ids": light_ids,
+                            "failed_lights": failed_lights,
+                            "duration_ms": duration,
+                            "color": color,
+                            "brightness": brightness,
+                            "restored": not no_restore,
+                        },
+                        indent=2,
+                    )
+                )
+                if failed_lights:
+                    return 2
+            elif not opts.quiet:
                 if failed_lights:
                     # Partial success - some lights failed to restore
                     typer.secho(
@@ -788,23 +882,37 @@ def apply(
         if exit_code and exit_code != 0:
             raise typer.Exit(exit_code)
     except Exception as e:
-        if opts.trace:
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        elif opts.trace:
             raise
-        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
 @samples_app.command(name="list")
-def samples_list() -> None:
+def samples_list(ctx: typer.Context) -> None:
     """List available automation samples."""
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
     samples = list_samples()
-    typer.echo("Available automation samples:")
-    for sample_name in samples:
-        typer.echo(f"  - {sample_name}")
+    if opts.json_output:
+        import json
+
+        typer.echo(json.dumps({"samples": samples, "count": len(samples)}, indent=2))
+    else:
+        typer.echo("Available automation samples:")
+        for sample_name in samples:
+            typer.echo(f"  - {sample_name}")
 
 
 @samples_app.command(name="show")
 def samples_show(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Sample name to show"),
 ) -> None:
     """Show a sample automation template.
@@ -815,16 +923,30 @@ def samples_show(
     Args:
         name: Sample name to display
     """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
     try:
         sample = get_sample(name)
-        typer.echo(sample)
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"sample_name": name, "content": sample}, indent=2))
+        else:
+            typer.echo(sample)
     except ValueError as e:
-        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
 @app.command()
 def doctor(
+    ctx: typer.Context,
     bridge_ip: str | None = typer.Option(
         None, "--bridge-ip", help="Bridge IP to diagnose (auto-discovered if omitted)"
     ),
@@ -874,88 +996,151 @@ def doctor(
       - "API error" → Re-run 'huesignal auth login'
       - "Light not reachable" → Check light power and Zigbee network
     """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
     try:
         status = asyncio.run(run_doctor(bridge_ip=bridge_ip, verbose=verbose))
-        typer.echo(status.report(verbose=verbose))
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps(status.to_dict(), indent=2))
+        else:
+            typer.echo(status.report(verbose=verbose))
         if not status.all_passed:
             raise typer.Exit(1)
     except Exception as e:
-        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
 @cache_app.command()
-def clear() -> None:
+def clear(ctx: typer.Context) -> None:
     """Clear all cached data.
 
     Removes cached bridge discovery results and light lists.
     Use this if you're experiencing stale data or after moving bridges to different IPs.
     """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
     cache = get_cache()
     cache.clear()
-    typer.secho("Cache cleared successfully.", fg=typer.colors.GREEN)
+    if opts.json_output:
+        import json
+
+        typer.echo(json.dumps({"success": True, "message": "Cache cleared successfully"}, indent=2))
+    else:
+        typer.secho("Cache cleared successfully.", fg=typer.colors.GREEN)
 
 
 @cache_app.command()
-def info() -> None:
+def info(ctx: typer.Context) -> None:
     """Show cache information.
 
     Displays cache location and statistics about cached data.
     """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
 
     cache = get_cache()
     cache_file = cache.cache_file
 
-    typer.echo(f"Cache location: {cache_file}")
+    if opts.json_output:
+        import json
+        import time
 
-    if not cache_file.exists():
-        typer.echo("Cache status: Empty (no cache file)")
-        return
+        result = {"cache_location": str(cache_file), "exists": cache_file.exists(), "entries": []}
 
-    try:
-        cache_data = cache._load_cache()
-        if not cache_data:
-            typer.echo("Cache status: Empty")
+        if cache_file.exists():
+            try:
+                cache_data = cache._load_cache()
+                if cache_data:
+                    result["count"] = len(cache_data)
+                    for key in cache_data.keys():
+                        entry = cache_data[key]
+                        entry_info = {"key": key}
+                        if "expires_at" in entry:
+                            remaining = int(entry["expires_at"] - time.time())
+                            entry_info["expires_in_seconds"] = remaining
+                            entry_info["expired"] = remaining <= 0
+                        else:
+                            entry_info["expires_in_seconds"] = None
+                            entry_info["expired"] = False
+                        result["entries"].append(entry_info)
+                else:
+                    result["count"] = 0
+            except Exception as e:
+                result["error"] = str(e)
+        else:
+            result["count"] = 0
+
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        typer.echo(f"Cache location: {cache_file}")
+
+        if not cache_file.exists():
+            typer.echo("Cache status: Empty (no cache file)")
             return
 
-        typer.echo(f"Cache status: {len(cache_data)} entries")
-        typer.echo("\nCached entries:")
+        try:
+            cache_data = cache._load_cache()
+            if not cache_data:
+                typer.echo("Cache status: Empty")
+                return
 
-        for key in cache_data.keys():
-            entry = cache_data[key]
-            if "expires_at" in entry:
-                import time
+            typer.echo(f"Cache status: {len(cache_data)} entries")
+            typer.echo("\nCached entries:")
 
-                remaining = int(entry["expires_at"] - time.time())
-                if remaining > 0:
-                    typer.echo(f"  - {key}: expires in {remaining}s")
+            for key in cache_data.keys():
+                entry = cache_data[key]
+                if "expires_at" in entry:
+                    import time
+
+                    remaining = int(entry["expires_at"] - time.time())
+                    if remaining > 0:
+                        typer.echo(f"  - {key}: expires in {remaining}s")
+                    else:
+                        typer.echo(f"  - {key}: EXPIRED")
                 else:
-                    typer.echo(f"  - {key}: EXPIRED")
-            else:
-                typer.echo(f"  - {key}: no expiration")
+                    typer.echo(f"  - {key}: no expiration")
 
-    except Exception as e:
-        typer.secho(f"Error reading cache: {e}", fg=typer.colors.RED)
+        except Exception as e:
+            typer.secho(f"Error reading cache: {e}", fg=typer.colors.RED)
 
 
 @cache_app.command()
-def prune() -> None:
+def prune(ctx: typer.Context) -> None:
     """Remove expired entries from cache.
 
     Cleans up cache by removing entries that have exceeded their TTL.
     This can help reduce cache file size.
     """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
     cache = get_cache()
     pruned = cache.prune_expired()
 
-    if pruned > 0:
-        typer.secho(f"Pruned {pruned} expired cache entries.", fg=typer.colors.GREEN)
+    if opts.json_output:
+        import json
+
+        typer.echo(json.dumps({"success": True, "pruned_count": pruned}, indent=2))
     else:
-        typer.echo("No expired entries to prune.")
+        if pruned > 0:
+            typer.secho(f"Pruned {pruned} expired cache entries.", fg=typer.colors.GREEN)
+        else:
+            typer.echo("No expired entries to prune.")
 
 
 @cache_app.command(name="set-bridge")
 def set_bridge_cmd(
+    ctx: typer.Context,
     bridge_ip: str = typer.Argument(..., help="Bridge IP address to cache as default"),
 ) -> None:
     """Set the default bridge IP address.
@@ -963,21 +1148,37 @@ def set_bridge_cmd(
     This sets the bridge IP that will be used by default for all commands.
     Useful if you want to manually specify which bridge to use.
     """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
     set_default_bridge_ip(bridge_ip)
-    typer.secho(f"Set default bridge IP to: {bridge_ip}", fg=typer.colors.GREEN)
+    if opts.json_output:
+        import json
+
+        typer.echo(json.dumps({"success": True, "bridge_ip": bridge_ip}, indent=2))
+    else:
+        typer.secho(f"Set default bridge IP to: {bridge_ip}", fg=typer.colors.GREEN)
 
 
 @cache_app.command(name="get-bridge")
-def get_bridge_cmd() -> None:
+def get_bridge_cmd(ctx: typer.Context) -> None:
     """Show the cached default bridge IP address.
 
     Displays the currently cached bridge IP that will be used by commands.
     """
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
     bridge_ip = get_default_bridge_ip()
-    if bridge_ip:
-        typer.echo(f"Default bridge IP: {bridge_ip}")
+    if opts.json_output:
+        import json
+
+        typer.echo(json.dumps({"bridge_ip": bridge_ip, "cached": bridge_ip is not None}, indent=2))
     else:
-        typer.echo("No default bridge IP cached.")
+        if bridge_ip:
+            typer.echo(f"Default bridge IP: {bridge_ip}")
+        else:
+            typer.echo("No default bridge IP cached.")
 
 
 # Add command groups to main app

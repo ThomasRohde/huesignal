@@ -39,6 +39,16 @@ class DoctorStatus:
 
         return "\n".join(lines)
 
+    def to_dict(self) -> dict:
+        """Convert status to JSON-serializable dictionary."""
+        return {
+            "success": self.all_passed,
+            "checks": self.checks,
+            "passed_count": sum(1 for c in self.checks if c["passed"]),
+            "failed_count": sum(1 for c in self.checks if not c["passed"]),
+            "total_count": len(self.checks),
+        }
+
 
 async def run_doctor(bridge_ip: str | None = None, verbose: bool = False) -> DoctorStatus:
     """

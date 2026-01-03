@@ -9,7 +9,7 @@ on:
       skip_existing:
         description: 'Skip if package version already exists on PyPI'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 jobs:

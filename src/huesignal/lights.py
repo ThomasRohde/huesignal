@@ -1,8 +1,9 @@
 """Lights management for Philips Hue."""
 
 import logging
+from typing import Any
 
-from aiohue.v2 import HueBridgeV2
+from aiohue.v2 import HueBridgeV2  # type: ignore[import-untyped]
 
 from huesignal.auth import get_app_key
 from huesignal.cache import get_cache
@@ -31,10 +32,10 @@ def _get_light_info_from_device(bridge: HueBridgeV2, light_id: str) -> tuple[str
                     if hasattr(bridge, "zigbee_connectivity"):
                         for conn_service in device.services:
                             if conn_service.rtype.value == "zigbee_connectivity":
-                                zigbee_conn = bridge.zigbee_connectivity.get(conn_service.rid)
+                                zigbee_conn = bridge.zigbee_connectivity.get(conn_service.rid)  # type: ignore[attr-defined]
                                 if zigbee_conn:
                                     # In v2 API, status "connected" means reachable
-                                    is_reachable = getattr(zigbee_conn, "status", None) == "connected"
+                                    is_reachable = getattr(zigbee_conn, "status", None) == "connected"  # type: ignore[arg-type]
                                 break
 
                     return device_name, is_reachable
@@ -52,7 +53,7 @@ async def list_lights(
     filter_name: str | None = None,
     json_output: bool = False,
     use_cache: bool = True,
-) -> dict:
+) -> dict[str, Any]:
     """
     List lights from the Hue Bridge.
 
@@ -89,12 +90,12 @@ async def list_lights(
         lights = client.bridge.lights
 
         # Build complete light list
-        all_lights = []
+        all_lights: list[dict[str, Any]] = []
         for light in lights.items:
             light_name, is_reachable = _get_light_info_from_device(client.bridge, light.id)
 
             # Extract light info
-            light_info = {
+            light_info: dict[str, Any] = {
                 "id": light.id,
                 "name": light_name,
                 "on": light.is_on if hasattr(light, "is_on") else False,
@@ -102,7 +103,7 @@ async def list_lights(
                 "color_support": bool(light.supports_color) if hasattr(light, "supports_color") else False,
                 "dim_support": bool(light.supports_dimming) if hasattr(light, "supports_dimming") else False,
                 "brightness": light.brightness if hasattr(light, "brightness") else None,
-                "type": getattr(light, "type", "Unknown"),
+                "type": str(getattr(light, "type", "Unknown")),
                 "model": light.owner.rid if hasattr(light, "owner") else "Unknown",
             }
             all_lights.append(light_info)
@@ -121,7 +122,7 @@ async def list_lights(
         return {"lights": all_lights, "count": len(all_lights)}
 
 
-async def show_light(bridge_ip: str, light_name: str, use_cache: bool = True) -> dict:
+async def show_light(bridge_ip: str, light_name: str, use_cache: bool = True) -> dict[str, Any]:
     """
     Get detailed information about a specific light.
 
@@ -193,7 +194,7 @@ async def show_light(bridge_ip: str, light_name: str, use_cache: bool = True) ->
         _, is_reachable = _get_light_info_from_device(client.bridge, target_light.id)
 
         # Extract detailed light info
-        light_info = {
+        light_info: dict[str, Any] = {
             "id": target_light.id,
             "name": target_light_name,
             "on": target_light.is_on if hasattr(target_light, "is_on") else False,
@@ -201,7 +202,7 @@ async def show_light(bridge_ip: str, light_name: str, use_cache: bool = True) ->
             "color_support": bool(target_light.supports_color) if hasattr(target_light, "supports_color") else False,
             "dim_support": bool(target_light.supports_dimming) if hasattr(target_light, "supports_dimming") else False,
             "brightness": target_light.brightness if hasattr(target_light, "brightness") else None,
-            "type": target_light.type if hasattr(target_light, "type") else "Unknown",
+            "type": str(target_light.type) if hasattr(target_light, "type") else "Unknown",
             "model": target_light.owner.rid if hasattr(target_light, "owner") else "Unknown",
         }
 

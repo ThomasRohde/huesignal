@@ -54,12 +54,14 @@ class Blink(Effect):
 
             await asyncio.sleep(interval_s)
 
-            # Turn on
+            # Turn on with color/brightness from options
             for light_id in self.light_ids:
-                if light_id in self.bridge.lights:
-                    try:
-                        await self.bridge.lights.set_state(light_id, on=True)
-                    except Exception:
-                        pass
+                await self._set_light_state(
+                    light_id,
+                    on=True,
+                    brightness=self.options.brightness,
+                    color=self.options.color,
+                    transition_time=0,  # Instant transition for blink effect
+                )
 
             await asyncio.sleep(interval_s)
