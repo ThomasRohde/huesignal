@@ -1,6 +1,6 @@
 [project]
 name = "huesignal"
-version = "1.2.0"
+version = "1.2.1"
 description = "Philips Hue notification system with CLI and daemon"
 readme = "README.md"
 requires-python = ">=3.11"
