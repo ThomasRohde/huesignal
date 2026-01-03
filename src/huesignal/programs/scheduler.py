@@ -35,9 +35,9 @@ class TrackResult:
     """
 
     light_pattern: str
-    light_ids: list[str] = field(default_factory=list)
-    failed_lights: list[str] = field(default_factory=list)
-    errors: list[str] = field(default_factory=list)
+    light_ids: list[str] = field(default_factory=lambda: [])
+    failed_lights: list[str] = field(default_factory=lambda: [])
+    errors: list[str] = field(default_factory=lambda: [])
 
 
 @dataclass
@@ -52,9 +52,9 @@ class ProgramResult:
     """
 
     program_name: str
-    track_results: list[TrackResult] = field(default_factory=list)
-    total_failed_lights: list[str] = field(default_factory=list)
-    restoration_failures: list[str] = field(default_factory=list)
+    track_results: list[TrackResult] = field(default_factory=lambda: [])
+    total_failed_lights: list[str] = field(default_factory=lambda: [])
+    restoration_failures: list[str] = field(default_factory=lambda: [])
 
     @property
     def success(self) -> bool:
@@ -193,8 +193,8 @@ class Scheduler:
                         # Add small delay between primitives to avoid overwhelming the bridge
                         await asyncio.sleep(0.05)
             else:
-                # Fallback to _apply_effect()
-                await effect._apply_effect()
+                # Fallback to _apply_effect() - using protected method intentionally
+                await effect._apply_effect()  # type: ignore[attr-defined]
 
         except Exception as e:
             logger.error(f"Failed to execute effect {action.effect_name}: {e}")
@@ -326,7 +326,8 @@ class Scheduler:
                     )
                     result.track_results.append(error_result)
                     logger.error(f"Track execution failed: {track_result}")
-                elif isinstance(track_result, TrackResult):
+                else:
+                    # track_result is TrackResult
                     result.track_results.append(track_result)
                     result.total_failed_lights.extend(
                         lid for lid in track_result.failed_lights if lid not in result.total_failed_lights

@@ -29,9 +29,15 @@ def mock_bridge():
     light2.color_temperature = None
 
     bridge.lights.items = [light1, light2]
-    bridge.lights.get = MagicMock(
-        side_effect=lambda lid: light1 if lid == "light-1" else light2 if lid == "light-2" else None
-    )
+
+    def get_light_by_id(lid: str):
+        if lid == "light-1":
+            return light1
+        elif lid == "light-2":
+            return light2
+        return None
+
+    bridge.lights.get = MagicMock(side_effect=get_light_by_id)
     bridge.lights.set_state = AsyncMock()
 
     # Mock devices for name lookup
@@ -72,13 +78,15 @@ def sample_snapshot():
 class TestExecutionContext:
     """Tests for ExecutionContext dataclass."""
 
-    def test_context_initialization(self, mock_bridge):
+    def test_context_initialization(self, mock_bridge: MagicMock) -> None:
         """Test ExecutionContext initializes with bridge."""
         ctx = ExecutionContext(bridge=mock_bridge)
         assert ctx.bridge == mock_bridge
         assert ctx.captured_states == {}
 
-    def test_context_initialization_with_captured_states(self, mock_bridge, sample_snapshot):
+    def test_context_initialization_with_captured_states(
+        self, mock_bridge: MagicMock, sample_snapshot: StateSnapshot
+    ) -> None:
         """Test ExecutionContext can be initialized with captured states."""
         ctx = ExecutionContext(bridge=mock_bridge, captured_states={"test": sample_snapshot})
         assert ctx.bridge == mock_bridge
@@ -86,7 +94,7 @@ class TestExecutionContext:
         assert ctx.captured_states["test"] == sample_snapshot
 
     @pytest.mark.asyncio
-    async def test_capture_state_all_lights(self, mock_bridge):
+    async def test_capture_state_all_lights(self, mock_bridge: MagicMock) -> None:
         """Test capturing state of all lights."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -99,7 +107,7 @@ class TestExecutionContext:
         assert ctx.captured_states["latest"] == snapshot
 
     @pytest.mark.asyncio
-    async def test_capture_state_specific_lights(self, mock_bridge):
+    async def test_capture_state_specific_lights(self, mock_bridge: MagicMock) -> None:
         """Test capturing state of specific lights."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -111,7 +119,7 @@ class TestExecutionContext:
         assert len(snapshot.lights) == 1
 
     @pytest.mark.asyncio
-    async def test_capture_state_stores_in_context(self, mock_bridge):
+    async def test_capture_state_stores_in_context(self, mock_bridge: MagicMock) -> None:
         """Test capture_state stores snapshot in context."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -122,7 +130,7 @@ class TestExecutionContext:
         assert "latest" in ctx.captured_states
 
     @pytest.mark.asyncio
-    async def test_capture_state_overwrites_latest(self, mock_bridge):
+    async def test_capture_state_overwrites_latest(self, mock_bridge: MagicMock) -> None:
         """Test multiple captures overwrite the 'latest' snapshot."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -133,7 +141,7 @@ class TestExecutionContext:
         assert ctx.captured_states["latest"] != snapshot1
 
     @pytest.mark.asyncio
-    async def test_restore_state_with_snapshot(self, mock_bridge, sample_snapshot):
+    async def test_restore_state_with_snapshot(self, mock_bridge: MagicMock, sample_snapshot: StateSnapshot) -> None:
         """Test restoring state with explicit snapshot."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -146,7 +154,7 @@ class TestExecutionContext:
         assert mock_bridge.lights.set_state.called
 
     @pytest.mark.asyncio
-    async def test_restore_state_with_captured_snapshot(self, mock_bridge):
+    async def test_restore_state_with_captured_snapshot(self, mock_bridge: MagicMock) -> None:
         """Test restoring state using captured snapshot."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -160,7 +168,7 @@ class TestExecutionContext:
         assert mock_bridge.lights.set_state.called
 
     @pytest.mark.asyncio
-    async def test_restore_state_without_capture_raises_error(self, mock_bridge):
+    async def test_restore_state_without_capture_raises_error(self, mock_bridge: MagicMock) -> None:
         """Test restore_state raises error if no state captured."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -168,7 +176,7 @@ class TestExecutionContext:
             await ctx.restore_state()
 
     @pytest.mark.asyncio
-    async def test_restore_state_with_skip_lights(self, mock_bridge, sample_snapshot):
+    async def test_restore_state_with_skip_lights(self, mock_bridge: MagicMock, sample_snapshot: StateSnapshot) -> None:
         """Test restoring state while skipping specific lights."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -179,11 +187,11 @@ class TestExecutionContext:
         # (This is a simplified check; full verification would require more mock inspection)
 
     @pytest.mark.asyncio
-    async def test_restore_state_returns_failures(self, mock_bridge, sample_snapshot):
+    async def test_restore_state_returns_failures(self, mock_bridge: MagicMock, sample_snapshot: StateSnapshot) -> None:
         """Test restore_state returns list of failed lights."""
 
         # Make one light fail to restore
-        async def set_state_with_failure(light_id, **kwargs):
+        async def set_state_with_failure(light_id: str, **kwargs: object) -> None:
             if light_id == "light-1":
                 raise Exception("Simulated failure")
 
@@ -195,7 +203,7 @@ class TestExecutionContext:
 
         assert "light-1" in failed_lights
 
-    def test_clear_captured_states(self, mock_bridge, sample_snapshot):
+    def test_clear_captured_states(self, mock_bridge: MagicMock, sample_snapshot: StateSnapshot) -> None:
         """Test clearing captured states."""
         ctx = ExecutionContext(bridge=mock_bridge, captured_states={"test": sample_snapshot, "latest": sample_snapshot})
 
@@ -207,7 +215,7 @@ class TestExecutionContext:
         assert ctx.captured_states == {}
 
     @pytest.mark.asyncio
-    async def test_context_reusable_across_executions(self, mock_bridge):
+    async def test_context_reusable_across_executions(self, mock_bridge: MagicMock) -> None:
         """Test context can be reused for multiple effect executions."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -227,7 +235,7 @@ class TestExecutionContext:
         assert snapshot2 is not None
 
     @pytest.mark.asyncio
-    async def test_capture_empty_light_ids_list(self, mock_bridge):
+    async def test_capture_empty_light_ids_list(self, mock_bridge: MagicMock) -> None:
         """Test capturing with empty light_ids list returns empty snapshot."""
         ctx = ExecutionContext(bridge=mock_bridge)
 
@@ -236,7 +244,7 @@ class TestExecutionContext:
         assert len(snapshot.lights) == 0
 
     @pytest.mark.asyncio
-    async def test_capture_nonexistent_light_ids(self, mock_bridge):
+    async def test_capture_nonexistent_light_ids(self, mock_bridge: MagicMock) -> None:
         """Test capturing with nonexistent light IDs returns empty snapshot."""
         ctx = ExecutionContext(bridge=mock_bridge)
 

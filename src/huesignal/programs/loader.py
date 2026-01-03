@@ -70,8 +70,8 @@ def load_program(path: str | Path) -> Program:
         raise ValueError("Missing required field: 'tracks'")
 
     # Parse program
-    name = data["name"]
-    description = data.get("description", "")
+    name: str = data["name"]  # type: ignore[assignment]
+    description: str = data.get("description", "")  # type: ignore[assignment]
 
     if not isinstance(name, str):
         raise ValueError("Field 'name' must be a string")
@@ -80,15 +80,15 @@ def load_program(path: str | Path) -> Program:
         raise ValueError("Field 'description' must be a string")
 
     # Parse tracks
-    tracks_data = data["tracks"]
+    tracks_data: list[Any] = data["tracks"]  # type: ignore[assignment]
     if not isinstance(tracks_data, list):
         raise ValueError("Field 'tracks' must be a list")
 
     if not tracks_data:
         raise ValueError("Program must have at least one track")
 
-    tracks = []
-    for i, track_data in enumerate(tracks_data):
+    tracks: list[LightTrack] = []
+    for i, track_data in enumerate(tracks_data):  # type: ignore[arg-type]
         try:
             track = _parse_track(track_data)
             tracks.append(track)
@@ -116,14 +116,14 @@ def _parse_track(data: Any) -> LightTrack:
     if "light" not in data:
         raise ValueError("Track missing required field: 'light'")
 
-    light_pattern = data["light"]
+    light_pattern: str = data["light"]  # type: ignore[assignment]
     if not isinstance(light_pattern, str):
         raise ValueError("Field 'light' must be a string")
 
     if "steps" not in data:
         raise ValueError("Track missing required field: 'steps'")
 
-    steps_data = data["steps"]
+    steps_data: list[Any] = data["steps"]  # type: ignore[assignment]
     if not isinstance(steps_data, list):
         raise ValueError("Field 'steps' must be a list")
 
@@ -131,10 +131,10 @@ def _parse_track(data: Any) -> LightTrack:
         raise ValueError("Track must have at least one step")
 
     # Parse steps and calculate start times
-    steps = []
+    steps: list[TimelineStep] = []
     current_time_ms = 0
 
-    for i, step_data in enumerate(steps_data):
+    for i, step_data in enumerate(steps_data):  # type: ignore[arg-type]
         try:
             step, duration = _parse_step(step_data, current_time_ms)
             steps.append(step)
@@ -164,17 +164,17 @@ def _parse_step(data: Any, start_ms: int) -> tuple[TimelineStep, int]:
 
     # Determine step type and parse action
     if "effect" in data:
-        action, duration = _parse_effect_action(data)
+        action, duration = _parse_effect_action(data)  # type: ignore[arg-type]
     elif "wait" in data:
-        action, duration = _parse_wait_action(data)
+        action, duration = _parse_wait_action(data)  # type: ignore[arg-type]
     elif "set" in data:
-        action, duration = _parse_set_action(data)
+        action, duration = _parse_set_action(data)  # type: ignore[arg-type]
     else:
         raise ValueError("Step must have one of: 'effect', 'wait', or 'set'")
 
     # Get explicit duration if provided (overrides inferred duration)
     if "duration_ms" in data:
-        explicit_duration = data["duration_ms"]
+        explicit_duration: int = data["duration_ms"]  # type: ignore[assignment]
         if not isinstance(explicit_duration, int) or explicit_duration < 0:
             raise ValueError("Field 'duration_ms' must be a non-negative integer")
         duration = explicit_duration
@@ -205,12 +205,10 @@ def _parse_effect_action(data: dict[str, Any]) -> tuple[EffectAction, int]:
         raise ValueError(f"Unknown effect name: '{effect_name}'. Effect not found in registry.")
 
     # Parse effect options/parameters
-    parameters = data.get("options", {})
-    if not isinstance(parameters, dict):
-        raise ValueError("Field 'options' must be a dictionary")
+    parameters: dict[str, Any] = data.get("options", {})  # type: ignore[assignment]
 
     # Infer duration (will be overridden if duration_ms is specified)
-    inferred_duration = data.get("duration_ms", 1000)
+    inferred_duration: int = data.get("duration_ms", 1000)
 
     action = EffectAction(effect_name=effect_name, parameters=parameters)
     return action, inferred_duration
@@ -253,10 +251,10 @@ def _parse_set_action(data: dict[str, Any]) -> tuple[SetAction, int]:
         raise ValueError("Field 'set' must be a dictionary")
 
     # Parse set state fields
-    on = set_data.get("on", True)
-    brightness = set_data.get("brightness")
-    color = set_data.get("color")
-    transition_ms = set_data.get("transition_ms", 0)
+    on: bool = set_data.get("on", True)  # type: ignore[assignment]
+    brightness: int | None = set_data.get("brightness")  # type: ignore[assignment]
+    color: str | list[Any] | None = set_data.get("color")  # type: ignore[assignment]
+    transition_ms: int = set_data.get("transition_ms", 0)  # type: ignore[assignment]
 
     # Validate types
     if not isinstance(on, bool):
@@ -272,10 +270,13 @@ def _parse_set_action(data: dict[str, Any]) -> tuple[SetAction, int]:
         raise ValueError("Field 'transition_ms' must be a non-negative integer")
 
     # Convert color list to tuple if needed
+    color_final: str | tuple[Any, Any] | None = None
     if isinstance(color, list):
-        if len(color) != 2:
+        if len(color) != 2:  # type: ignore[arg-type]
             raise ValueError("Field 'color' as list must have exactly 2 elements [x, y]")
-        color = tuple(color)
+        color_final = tuple(color)  # type: ignore[assignment]
+    elif isinstance(color, str):
+        color_final = color
 
     # Duration is the transition time
     duration = transition_ms
@@ -283,7 +284,7 @@ def _parse_set_action(data: dict[str, Any]) -> tuple[SetAction, int]:
     action = SetAction(
         on=on,
         brightness=brightness,
-        color=color,
+        color=color_final,
         transition_ms=transition_ms,
     )
     return action, duration

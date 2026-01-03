@@ -68,53 +68,53 @@ class TestResolveLight:
     """Tests for resolve_light function."""
 
     @pytest.mark.asyncio
-    async def test_resolve_by_exact_name(self, mock_bridge):
+    async def test_resolve_by_exact_name(self, mock_bridge: MagicMock) -> None:
         """Test resolving light by exact name match."""
         result = await resolve_light(mock_bridge, light_name="Desk Lamp")
         assert result.light_id == "1"
         assert result.light_name == "Desk Lamp"
 
     @pytest.mark.asyncio
-    async def test_resolve_by_case_insensitive_name(self, mock_bridge):
+    async def test_resolve_by_case_insensitive_name(self, mock_bridge: MagicMock) -> None:
         """Test resolving light by case-insensitive name match."""
         result = await resolve_light(mock_bridge, light_name="desk lamp")
         assert result.light_id == "1"
         assert result.light_name == "Desk Lamp"
 
     @pytest.mark.asyncio
-    async def test_resolve_by_light_id(self, mock_bridge):
+    async def test_resolve_by_light_id(self, mock_bridge: MagicMock) -> None:
         """Test resolving light by ID."""
         result = await resolve_light(mock_bridge, light_id="2")
         assert result.light_id == "2"
         assert result.light_name == "Bedroom Light"
 
     @pytest.mark.asyncio
-    async def test_resolve_light_id_takes_precedence(self, mock_bridge):
+    async def test_resolve_light_id_takes_precedence(self, mock_bridge: MagicMock) -> None:
         """Test that light_id takes precedence over light_name."""
         result = await resolve_light(mock_bridge, light_name="Desk Lamp", light_id="2")
         assert result.light_id == "2"
         assert result.light_name == "Bedroom Light"
 
     @pytest.mark.asyncio
-    async def test_resolve_nonexistent_light_by_name(self, mock_bridge):
+    async def test_resolve_nonexistent_light_by_name(self, mock_bridge: MagicMock) -> None:
         """Test that LightNotFoundError is raised for nonexistent light name."""
         with pytest.raises(LightNotFoundError):
             await resolve_light(mock_bridge, light_name="Nonexistent Light")
 
     @pytest.mark.asyncio
-    async def test_resolve_nonexistent_light_by_id(self, mock_bridge):
+    async def test_resolve_nonexistent_light_by_id(self, mock_bridge: MagicMock) -> None:
         """Test that LightNotFoundError is raised for nonexistent light ID."""
         with pytest.raises(LightNotFoundError):
             await resolve_light(mock_bridge, light_id="999")
 
     @pytest.mark.asyncio
-    async def test_resolve_no_identifier_raises_error(self, mock_bridge):
+    async def test_resolve_no_identifier_raises_error(self, mock_bridge: MagicMock) -> None:
         """Test that ValueError is raised when no identifier provided."""
         with pytest.raises(ValueError):
             await resolve_light(mock_bridge)
 
     @pytest.mark.asyncio
-    async def test_ambiguous_light_name(self, mock_bridge):
+    async def test_ambiguous_light_name(self, mock_bridge: MagicMock) -> None:
         """Test that AmbiguousLightError is raised for ambiguous names."""
         # Add duplicate light names
         light = MagicMock()
@@ -145,7 +145,7 @@ class TestResolveLights:
     """Tests for resolve_lights function."""
 
     @pytest.mark.asyncio
-    async def test_resolve_multiple_lights_by_name(self, mock_bridge):
+    async def test_resolve_multiple_lights_by_name(self, mock_bridge: MagicMock) -> None:
         """Test resolving multiple lights by name."""
         result = await resolve_lights(mock_bridge, light_names=["Desk Lamp", "Bedroom Light"])
         assert len(result) == 2
@@ -153,7 +153,7 @@ class TestResolveLights:
         assert result[1].light_id == "2"
 
     @pytest.mark.asyncio
-    async def test_resolve_multiple_lights_by_id(self, mock_bridge):
+    async def test_resolve_multiple_lights_by_id(self, mock_bridge: MagicMock) -> None:
         """Test resolving multiple lights by ID."""
         result = await resolve_lights(mock_bridge, light_ids=["1", "3"])
         assert len(result) == 2
@@ -161,26 +161,26 @@ class TestResolveLights:
         assert result[1].light_id == "3"
 
     @pytest.mark.asyncio
-    async def test_resolve_all_lights_when_no_args(self, mock_bridge):
+    async def test_resolve_all_lights_when_no_args(self, mock_bridge: MagicMock) -> None:
         """Test resolving all lights when no arguments provided."""
         result = await resolve_lights(mock_bridge)
         assert len(result) == 3
         assert {r.light_id for r in result} == {"1", "2", "3"}
 
     @pytest.mark.asyncio
-    async def test_resolve_lights_invalid_id(self, mock_bridge):
+    async def test_resolve_lights_invalid_id(self, mock_bridge: MagicMock) -> None:
         """Test that LightNotFoundError is raised for invalid ID."""
         with pytest.raises(LightNotFoundError):
             await resolve_lights(mock_bridge, light_ids=["999"])
 
     @pytest.mark.asyncio
-    async def test_resolve_lights_invalid_name(self, mock_bridge):
+    async def test_resolve_lights_invalid_name(self, mock_bridge: MagicMock) -> None:
         """Test that LightNotFoundError is raised for invalid name."""
         with pytest.raises(LightNotFoundError):
             await resolve_lights(mock_bridge, light_names=["Nonexistent"])
 
     @pytest.mark.asyncio
-    async def test_light_id_takes_precedence(self, mock_bridge):
+    async def test_light_id_takes_precedence(self, mock_bridge: MagicMock) -> None:
         """Test that light_ids takes precedence over light_names."""
         result = await resolve_lights(
             mock_bridge,
