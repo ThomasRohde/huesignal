@@ -95,10 +95,10 @@ def run_getting_started_wizard() -> None:
     if cached_ip:
         typer.secho(f"✓ Found cached bridge: {cached_ip}", fg=typer.colors.GREEN)
         # Try to get app key
-        try:
-            app_key = get_app_key(cached_ip)
+        app_key = get_app_key()
+        if app_key:
             typer.secho(f"✓ Found stored credentials for {cached_ip}", fg=typer.colors.GREEN)
-        except AuthError:
+        else:
             typer.secho("⚠ No credentials found. Need to authenticate.", fg=typer.colors.YELLOW)
     else:
         typer.echo("No bridge configured yet.")
@@ -560,8 +560,8 @@ def list_cmd(
       huesignal lights list -f bedroom
 
       # Get JSON output for scripting
-      huesignal lights list --json
-      huesignal lights list --json --quiet | jq '.lights[].name'
+      huesignal --json lights list
+      huesignal --json --quiet lights list | jq '.lights[].name'
 
     Use --json flag for machine-readable output in automation scripts.
     Combine with --quiet to suppress informational messages.
@@ -1237,6 +1237,23 @@ def apply(
                     typer.secho(f"Error: {e}", fg=typer.colors.RED)
                     raise typer.Exit(1)
 
+            # Validate color if provided
+            if color is not None:
+                from huesignal.effects.colors import list_color_names, parse_color
+
+                try:
+                    # Try to parse color to validate it
+                    parse_color(color)
+                except ValueError:
+                    # Show helpful error with available colors
+                    color_names = list_color_names()
+                    error_msg = f"Invalid color: '{color}'\n\nValid color names: {', '.join(color_names[:15])}"
+                    if len(color_names) > 15:
+                        error_msg += f", ... ({len(color_names)} total)"
+                    error_msg += "\n\nOr use hex format: #RRGGBB (e.g., #FF0000 for red)"
+                    typer.secho(error_msg, fg=typer.colors.RED)
+                    raise typer.Exit(1)
+
             # Parse effect parameters
             effect_params = {}
 
@@ -1619,10 +1636,10 @@ def preset(
         "success": {"effect": "pulse", "color": "success", "brightness": 0.8, "duration": 1000, "count": 1},
         "error": {"effect": "blink", "color": "error", "brightness": 1.0, "duration": 1500, "count": 3},
         "warning": {"effect": "pulse", "color": "warning", "brightness": 0.7, "duration": 1200, "count": 1},
-        "working": {"effect": "breathe", "color": "working", "brightness": 0.5, "duration": 2000, "count": 1},
+        "working": {"effect": "breathe", "color": "working", "brightness": 0.5, "duration": 2000},
         "complete": {"effect": "pulse", "color": "success", "brightness": 0.9, "duration": 800, "count": 2},
         "claim": {"effect": "pulse", "color": "blue", "brightness": 0.6, "duration": 1000, "count": 1},
-        "verify": {"effect": "breathe", "color": "cyan", "brightness": 0.6, "duration": 1500, "count": 1},
+        "verify": {"effect": "breathe", "color": "cyan", "brightness": 0.6, "duration": 1500},
         "blocker": {"effect": "blink", "color": "error", "brightness": 1.0, "duration": 2000, "count": 5},
     }
 

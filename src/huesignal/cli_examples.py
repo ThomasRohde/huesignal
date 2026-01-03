@@ -32,11 +32,11 @@ EXPLAIN_TEXT = r"""
 │   huesignal lights list --filter desk                                         │
 │                                                                               │
 │ Get JSON output (for parsing in scripts):                                    │
-│   huesignal lights list --json                                                │
+│   huesignal --json lights list                                                │
 │                                                                               │
 │ Show detailed info about a specific light:                                   │
 │   huesignal lights show "Desk Lamp"                                           │
-│   huesignal lights show desk-light --json                                     │
+│   huesignal --json lights show desk-light                                     │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌─ BASIC LIGHT CONTROL ────────────────────────────────────────────────────────┐
@@ -240,7 +240,7 @@ EXPLAIN_TEXT = r"""
 │ Examples:                                                                     │
 │   huesignal lights list --verbose                                             │
 │   huesignal effect apply pulse -l desk-light -c green --quiet                 │
-│   huesignal lights show desk-light --json | jq .                              │
+│   huesignal --json lights show desk-light | jq .                              │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌─ ENVIRONMENT VARIABLE CONFIGURATION ─────────────────────────────────────────┐
@@ -267,7 +267,7 @@ EXPLAIN_TEXT = r"""
 │   huesignal effect apply pulse -l desk-light -c green 2>/dev/null || true    │
 │                                                                               │
 │ Parse JSON output in scripts:                                                │
-│   LIGHTS=$(huesignal lights list --json --quiet)                             │
+│   LIGHTS=$(huesignal --json --quiet lights list)                             │
 │   echo $LIGHTS | jq -r '.lights[0].name'                                     │
 │                                                                               │
 │ Check exit codes:                                                             │

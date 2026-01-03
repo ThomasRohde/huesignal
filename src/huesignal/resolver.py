@@ -21,9 +21,45 @@ class AmbiguousLightError(Exception):
 class LightNotFoundError(Exception):
     """Raised when light name or ID is not found."""
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, available_lights: list[str] | None = None):
         self.identifier = identifier
-        super().__init__(f"Light not found: {identifier}")
+        self.available_lights = available_lights or []
+
+        msg = f"Light not found: '{identifier}'"
+
+        # Add suggestions if available lights provided
+        if available_lights:
+            # Find close matches using simple similarity
+            suggestions = []
+            identifier_lower = identifier.lower()
+
+            # Exact substring matches
+            for light in available_lights:
+                if identifier_lower in light.lower() or light.lower() in identifier_lower:
+                    suggestions.append(light)
+
+            # If no substring matches, look for common words
+            if not suggestions:
+                id_words = set(identifier_lower.split())
+                for light in available_lights:
+                    light_words = set(light.lower().split())
+                    if id_words & light_words:  # Any common words
+                        suggestions.append(light)
+
+            if suggestions:
+                msg += "\n\nDid you mean one of these?\n"
+                for light in suggestions[:5]:  # Show max 5 suggestions
+                    msg += f"  - {light}\n"
+            else:
+                msg += "\n\nAvailable lights:\n"
+                for light in available_lights[:10]:  # Show first 10
+                    msg += f"  - {light}\n"
+                if len(available_lights) > 10:
+                    msg += f"  ... and {len(available_lights) - 10} more\n"
+
+            msg += "\nUse 'huesignal lights list' to see all lights."
+
+        super().__init__(msg)
 
 
 @dataclass
@@ -91,17 +127,19 @@ async def resolve_light(
         light_name_lower = light_name.lower()
 
         # Build light ID to name mapping from devices
+        available_lights = []
         for device in bridge.devices.items:
             if hasattr(device, "services") and hasattr(device, "metadata"):
                 device_name = device.metadata.name
                 for service in device.services:
                     if service.rtype.value == "light":
+                        available_lights.append(device_name)
                         if device_name.lower() == light_name_lower:
                             # Exact case-insensitive match
                             matches.append((service.rid, device_name))
 
         if len(matches) == 0:
-            raise LightNotFoundError(light_name)
+            raise LightNotFoundError(light_name, available_lights)
         elif len(matches) == 1:
             light_id, light_name_result = matches[0]
             return ResolvedLight(light_id=light_id, light_name=light_name_result)
