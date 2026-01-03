@@ -1,10 +1,11 @@
 """Rainbow effect implementation."""
 
 import asyncio
+from typing import Any, ClassVar
 
 from aiohue.v2 import HueBridgeV2
 
-from huesignal.effects.base import Effect, EffectOptions, register_effect
+from huesignal.effects.base import Effect, EffectOptions, EffectParam, register_effect
 from huesignal.effects.colors import rgb_to_xy
 
 # Rainbow colors in RGB
@@ -25,6 +26,9 @@ class Rainbow(Effect):
 
     name = "rainbow"
     description = "Cycle through rainbow colors"
+    params: ClassVar[list[EffectParam]] = [
+        EffectParam(name="step_ms", type=int, default=100, description="Time between color steps in milliseconds"),
+    ]
 
     def __init__(
         self,
@@ -43,6 +47,73 @@ class Rainbow(Effect):
         """
         super().__init__(bridge, light_ids, options)
         self.step_ms = step_ms
+
+    def to_primitives(self) -> list[Any]:
+        """Convert rainbow effect to sequence of primitives.
+
+        For color lights: cycles through rainbow colors.
+        For non-color lights: performs brightness wave.
+
+        Returns:
+            List of SetState and Wait primitives that implement the rainbow effect.
+        """
+        from huesignal.effects.primitives import SetState, Wait
+
+        primitives: list[Any] = []
+
+        # Classify lights by color support (need bridge access)
+        color_lights = []
+        non_color_lights = []
+
+        for light_id in self.light_ids:
+            light = self.bridge.lights.get(light_id)
+            if light:
+                # Check if light supports color
+                if light.color:
+                    color_lights.append(light_id)
+                else:
+                    non_color_lights.append(light_id)
+
+        # Calculate duration and number of steps
+        duration_ms = self.options.duration_ms
+        num_steps = max(1, duration_ms // self.step_ms)
+
+        # Generate color cycle primitives for color lights
+        if color_lights:
+            colors_count = len(RAINBOW_COLORS)
+
+            for step in range(num_steps):
+                # Calculate which color to use
+                color_index = (step * colors_count) // num_steps
+                color_index = color_index % colors_count
+                rgb = RAINBOW_COLORS[color_index]
+                xy = rgb_to_xy(*rgb)
+
+                primitives.append(
+                    SetState(on=True, brightness=self.options.brightness, color=xy, transition_ms=self.step_ms)
+                )
+                primitives.append(Wait(duration_ms=self.step_ms))
+
+        # Generate brightness wave primitives for non-color lights
+        if non_color_lights:
+            min_brightness = 80
+            max_brightness = 254
+
+            for step in range(num_steps):
+                # Calculate brightness (wave pattern: 0->1->0)
+                progress = step / max(1, num_steps - 1)
+                # Use sine-like wave: goes 0->1->0
+                if progress <= 0.5:
+                    wave_value = progress * 2
+                else:
+                    wave_value = 2 - progress * 2
+
+                brightness = int(min_brightness + (max_brightness - min_brightness) * wave_value)
+
+                primitives.append(SetState(on=True, brightness=brightness, color=None, transition_ms=self.step_ms))
+                primitives.append(Wait(duration_ms=self.step_ms))
+
+        return primitives
 
     async def _apply_effect(self) -> None:
         """Apply the rainbow effect to all lights.

@@ -1,10 +1,11 @@
 """Pulse effect implementation."""
 
 import asyncio
+from typing import Any, ClassVar
 
 from aiohue.v2 import HueBridgeV2
 
-from huesignal.effects.base import Effect, EffectOptions, register_effect
+from huesignal.effects.base import Effect, EffectOptions, EffectParam, register_effect
 
 
 @register_effect
@@ -13,6 +14,12 @@ class Pulse(Effect):
 
     name = "pulse"
     description = "Pulse brightness or color changes"
+    params: ClassVar[list[EffectParam]] = [
+        EffectParam(name="count", type=int, default=1, description="Number of pulse cycles"),
+        EffectParam(
+            name="interval_ms", type=int, default=500, description="Time for each pulse transition in milliseconds"
+        ),
+    ]
 
     def __init__(
         self,
@@ -34,6 +41,34 @@ class Pulse(Effect):
         super().__init__(bridge, light_ids, options)
         self.count = count
         self.interval_ms = interval_ms
+
+    def to_primitives(self) -> list[Any]:
+        """Convert pulse effect to sequence of primitives.
+
+        Returns:
+            List of SetState and Wait primitives that implement the pulse effect.
+        """
+        from huesignal.effects.primitives import SetState, Wait
+
+        primitives: list[Any] = []
+        target_brightness = self.options.brightness if self.options.brightness else 254
+
+        for _ in range(self.count):
+            # Pulse DOWN: dim to brightness 1
+            primitives.append(SetState(on=True, brightness=1, color=self.options.color, transition_ms=self.interval_ms))
+            # Wait for transition + buffer
+            primitives.append(Wait(duration_ms=self.interval_ms + 100))
+
+            # Pulse UP: go to target brightness
+            primitives.append(
+                SetState(
+                    on=True, brightness=target_brightness, color=self.options.color, transition_ms=self.interval_ms
+                )
+            )
+            # Wait for transition + buffer
+            primitives.append(Wait(duration_ms=self.interval_ms + 100))
+
+        return primitives
 
     async def _apply_effect(self) -> None:
         """Apply the pulse effect to all lights.

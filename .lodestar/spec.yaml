@@ -1003,3 +1003,527 @@ tasks:
         lines: null
       excerpt: null
       prd_hash: 9a89ec124ce9468111a13762b3ab7b3084d53cb25eb326d84c9ee1de333943a2
+  E001:
+    title: Create primitives.py with atomic operations
+    description: 'WHAT: Create primitive classes (SetState, Wait) as atomic light
+      operations
+
+      WHERE: src/huesignal/effects/primitives.py (new file)
+
+      WHY: Foundation for composable effects and YAML programs (EFFECTS_PRD.md #feature-primitives)
+
+      SCOPE: Only primitives + PrimitiveResult. Do NOT modify existing effects yet.
+
+      ACCEPT: 1) SetState sets on/brightness/color/transition 2) Wait sleeps correctly
+      3) Unit tests pass
+
+      REFS: Pattern follows effects/base.py dataclass style'
+    acceptance_criteria:
+    - SetState primitive can set on, brightness, color, transition_ms
+    - Wait primitive sleeps for specified duration
+    - PrimitiveResult captures success/failure per light
+    - Unit tests cover basic primitive execution
+    depends_on: []
+    labels:
+    - foundation
+    locks:
+    - src/huesignal/effects/primitives.py
+    priority: 1
+    status: verified
+    created_at: '2026-01-03T05:25:34.150752+00:00'
+    updated_at: '2026-01-03T05:33:27.351565+00:00'
+    completed_by: A197872D6
+    completed_at: &id024 2026-01-03 05:33:27.351565+00:00
+    verified_by: A197872D6
+    verified_at: *id024
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-primitives'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E002:
+    title: Create context.py with ExecutionContext
+    description: 'WHAT: Create ExecutionContext dataclass for effect execution
+
+      WHERE: src/huesignal/effects/context.py (new file)
+
+      WHY: Shared context with state management (EFFECTS_PRD.md #feature-context)
+
+      SCOPE: Context only. Do NOT refactor effects to use it yet.
+
+      ACCEPT: 1) Wraps HueBridgeV2 2) capture_state() works 3) restore_state() returns
+      failures
+
+      REFS: Use state.py patterns for capture/restore logic'
+    acceptance_criteria:
+    - ExecutionContext wraps HueBridgeV2 bridge
+    - capture_state() captures specified light states
+    - restore_state() restores and returns failed light IDs
+    - Unit tests verify state capture/restore
+    depends_on:
+    - E001
+    labels:
+    - foundation
+    locks:
+    - src/huesignal/effects/context.py
+    priority: 1
+    status: verified
+    created_at: '2026-01-03T05:26:29.071369+00:00'
+    updated_at: '2026-01-03T05:35:01.313605+00:00'
+    completed_by: A197872D6
+    completed_at: &id025 2026-01-03 05:35:01.313605+00:00
+    verified_by: A197872D6
+    verified_at: *id025
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-context'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E003:
+    title: Add EffectParam introspection to Effect base class
+    description: 'WHAT: Add EffectParam dataclass and params class variable to Effect
+
+      WHERE: src/huesignal/effects/base.py
+
+      WHY: Enable CLI introspection of effect parameters (EFFECTS_PRD.md #feature-effect-params)
+
+      SCOPE: Add EffectParam + params. Do NOT change Effect constructor signature
+      yet.
+
+      ACCEPT: 1) EffectParam has name/type/default/description 2) Effect.params exists
+      3) get_params() works
+
+      REFS: Keep backward compatible with existing effect instantiation'
+    acceptance_criteria:
+    - EffectParam dataclass with name, param_type, default, description
+    - 'Effect base class has params: ClassVar[list[EffectParam]] = []'
+    - Effect.get_params() returns declared parameters
+    - Existing tests continue to pass
+    depends_on: []
+    labels:
+    - effect-refactor
+    locks:
+    - src/huesignal/effects/base.py
+    priority: 2
+    status: verified
+    created_at: '2026-01-03T05:26:34.114765+00:00'
+    updated_at: '2026-01-03T05:36:16.302826+00:00'
+    completed_by: A197872D6
+    completed_at: &id026 2026-01-03 05:36:16.302826+00:00
+    verified_by: A197872D6
+    verified_at: *id026
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-effect-params'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E010:
+    title: Create programs/timeline.py with Program, LightTrack, Actions
+    description: 'WHAT: Create timeline data structures for multi-light choreography
+
+      WHERE: src/huesignal/programs/timeline.py (new file), src/huesignal/programs/__init__.py
+      (new)
+
+      WHY: Data model for effect programs (EFFECTS_PRD.md #feature-timeline)
+
+      SCOPE: Data structures only. No execution logic yet.
+
+      ACCEPT: 1) Program/LightTrack/TimelineStep defined 2) Actions defined 3) total_duration_ms()
+      works
+
+      REFS: Use dataclass pattern from effects'
+    acceptance_criteria:
+    - Program dataclass with name, description, tracks
+    - LightTrack with light_pattern and steps list
+    - TimelineStep with start_ms, duration_ms, action
+    - EffectAction, WaitAction, SetAction defined
+    - Program.total_duration_ms() calculates correctly
+    depends_on: []
+    labels:
+    - programs
+    locks:
+    - src/huesignal/programs/timeline.py
+    - src/huesignal/programs/__init__.py
+    priority: 5
+    status: verified
+    created_at: '2026-01-03T05:26:38.504143+00:00'
+    updated_at: '2026-01-03T05:46:38.794450+00:00'
+    completed_by: A175C6008
+    completed_at: &id027 2026-01-03 05:46:38.794450+00:00
+    verified_by: A175C6008
+    verified_at: *id027
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-timeline'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E004:
+    title: Refactor Pulse effect with params and to_primitives()
+    description: 'WHAT: Add params declaration and to_primitives() to Pulse effect
+
+      WHERE: src/huesignal/effects/pulse.py
+
+      WHY: Proof of concept for effect refactoring (EFFECTS_PRD.md #feature-effect-refactor)
+
+      SCOPE: Pulse only. Keep _apply_effect() working. Add to_primitives() as alternative.
+
+      ACCEPT: 1) params declares count/interval_ms 2) to_primitives() generates sequence
+      3) Both paths work
+
+      REFS: Follow pattern from E003'
+    acceptance_criteria:
+    - Pulse.params declares count and interval_ms with EffectParam
+    - Pulse.to_primitives() returns list of (light_id, primitives) tuples
+    - Existing _apply_effect() still works
+    - Unit tests verify both execution paths
+    depends_on:
+    - E001
+    - E003
+    labels:
+    - effect-refactor
+    locks:
+    - src/huesignal/effects/pulse.py
+    priority: 2
+    status: verified
+    created_at: '2026-01-03T05:28:26.217884+00:00'
+    updated_at: '2026-01-03T05:37:31.384727+00:00'
+    completed_by: A197872D6
+    completed_at: &id028 2026-01-03 05:37:31.384727+00:00
+    verified_by: A197872D6
+    verified_at: *id028
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-effect-refactor'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E005:
+    title: Refactor Blink effect with params and to_primitives()
+    description: 'WHAT: Add params declaration and to_primitives() to Blink effect
+
+      WHERE: src/huesignal/effects/blink.py
+
+      WHY: Continue effect refactoring (EFFECTS_PRD.md #feature-effect-refactor)
+
+      SCOPE: Blink only. Follow Pulse pattern from E004.
+
+      ACCEPT: 1) params declares count/interval_ms 2) to_primitives() works 3) Existing
+      tests pass
+
+      REFS: Follow Pulse pattern from E004'
+    acceptance_criteria:
+    - Blink.params declares count and interval_ms
+    - Blink.to_primitives() generates on/off sequence
+    - Existing tests pass
+    depends_on:
+    - E004
+    labels:
+    - effect-refactor
+    locks:
+    - src/huesignal/effects/blink.py
+    priority: 3
+    status: verified
+    created_at: '2026-01-03T05:28:30.450899+00:00'
+    updated_at: '2026-01-03T05:41:49.566023+00:00'
+    completed_by: A175C6008
+    completed_at: &id029 2026-01-03 05:41:49.566023+00:00
+    verified_by: A175C6008
+    verified_at: *id029
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-effect-refactor'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E006:
+    title: Refactor Breathe effect with params and to_primitives()
+    description: 'WHAT: Add params declaration and to_primitives() to Breathe effect
+
+      WHERE: src/huesignal/effects/breathe.py
+
+      WHY: Continue effect refactoring (EFFECTS_PRD.md #feature-effect-refactor)
+
+      SCOPE: Breathe only. Handle rate-limiting in primitives.
+
+      ACCEPT: 1) params declares duration_ms/period_ms 2) to_primitives() works 3)
+      Rate limiting preserved
+
+      REFS: Follow Pulse pattern, preserve rate-limiting logic'
+    acceptance_criteria:
+    - Breathe.params declares duration_ms and period_ms
+    - Breathe.to_primitives() generates fade sequence
+    - Rate limiting is preserved (50ms minimum step)
+    - Existing tests pass
+    depends_on:
+    - E004
+    labels:
+    - effect-refactor
+    locks:
+    - src/huesignal/effects/breathe.py
+    priority: 3
+    status: verified
+    created_at: '2026-01-03T05:28:34.842381+00:00'
+    updated_at: '2026-01-03T05:42:27.279952+00:00'
+    completed_by: A175C6008
+    completed_at: &id030 2026-01-03 05:42:27.279952+00:00
+    verified_by: A175C6008
+    verified_at: *id030
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-effect-refactor'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E007:
+    title: Refactor Rainbow effect with params and to_primitives()
+    description: 'WHAT: Add params declaration and to_primitives() to Rainbow effect
+
+      WHERE: src/huesignal/effects/rainbow.py
+
+      WHY: Complete effect refactoring (EFFECTS_PRD.md #feature-effect-refactor)
+
+      SCOPE: Rainbow only. Handle color vs brightness-wave logic.
+
+      ACCEPT: 1) params declares step_ms 2) to_primitives() works 3) Color/brightness
+      fallback preserved
+
+      REFS: Follow Pulse pattern, preserve capability detection'
+    acceptance_criteria:
+    - Rainbow.params declares step_ms
+    - Rainbow.to_primitives() handles color and non-color lights
+    - Brightness wave fallback for non-color lights preserved
+    - Existing tests pass
+    depends_on:
+    - E004
+    labels:
+    - effect-refactor
+    locks:
+    - src/huesignal/effects/rainbow.py
+    priority: 3
+    status: verified
+    created_at: '2026-01-03T05:28:39.132888+00:00'
+    updated_at: '2026-01-03T05:43:01.656960+00:00'
+    completed_by: A175C6008
+    completed_at: &id031 2026-01-03 05:43:01.656960+00:00
+    verified_by: A175C6008
+    verified_at: *id031
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-effect-refactor'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E008:
+    title: Add --param option and remove hardcoded effect handling
+    description: 'WHAT: Add --param key=value option, remove if effect_name in (''pulse'',
+      ''blink'') hardcoding
+
+      WHERE: src/huesignal/cli.py
+
+      WHY: Generic effect parameter passing (EFFECTS_PRD.md #feature-cli-params)
+
+      SCOPE: CLI apply command only. Keep --count for backward compat.
+
+      ACCEPT: 1) --param works 2) Hardcoding removed 3) --count still works 4) Unknown
+      params error
+
+      REFS: Use Effect.get_params() for validation'
+    acceptance_criteria:
+    - --param count=3 passes parameter to effect
+    - Hardcoded effect_name check removed from cli.py
+    - --count 3 still works for pulse/blink (backward compat)
+    - Unknown parameters raise helpful error
+    depends_on:
+    - E004
+    - E005
+    labels:
+    - cli
+    locks:
+    - src/huesignal/cli.py
+    priority: 4
+    status: verified
+    created_at: '2026-01-03T05:29:20.780804+00:00'
+    updated_at: '2026-01-03T05:44:17.471951+00:00'
+    completed_by: A175C6008
+    completed_at: &id032 2026-01-03 05:44:17.471951+00:00
+    verified_by: A175C6008
+    verified_at: *id032
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-cli-params'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E009:
+    title: Add 'effect params' command to list effect parameters
+    description: 'WHAT: Add CLI command to show effect parameters with types and defaults
+
+      WHERE: src/huesignal/cli.py
+
+      WHY: Discoverability for effect parameters (EFFECTS_PRD.md #feature-cli-params)
+
+      SCOPE: New subcommand only. Table and JSON output.
+
+      ACCEPT: 1) effect params pulse shows params 2) --json works 3) Unknown effect
+      errors
+
+      REFS: Follow effect list command pattern'
+    acceptance_criteria:
+    - effect params pulse shows count, interval_ms with types/defaults
+    - --json outputs structured parameter info
+    - Unknown effect name returns non-zero exit code
+    depends_on:
+    - E003
+    labels:
+    - cli
+    locks:
+    - src/huesignal/cli.py
+    priority: 4
+    status: verified
+    created_at: '2026-01-03T05:29:24.997672+00:00'
+    updated_at: '2026-01-03T05:45:53.472073+00:00'
+    completed_by: A175C6008
+    completed_at: &id033 2026-01-03 05:45:53.472073+00:00
+    verified_by: A175C6008
+    verified_at: *id033
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-cli-params'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E011:
+    title: Create programs/scheduler.py for parallel program execution
+    description: 'WHAT: Create Scheduler class to execute programs with proper timing
+
+      WHERE: src/huesignal/programs/scheduler.py (new file)
+
+      WHY: Execute multi-track programs in parallel (EFFECTS_PRD.md #feature-scheduler)
+
+      SCOPE: Scheduler only. Assumes light patterns already resolved.
+
+      ACCEPT: 1) Tracks run in parallel 2) Timing is correct 3) Failures tracked 4)
+      State restoration works
+
+      REFS: Use asyncio.gather for parallel execution'
+    acceptance_criteria:
+    - Scheduler.run_program() executes all tracks
+    - Multiple tracks run in parallel via asyncio
+    - Steps execute at correct relative times
+    - Failed lights are returned
+    depends_on:
+    - E002
+    - E010
+    labels:
+    - programs
+    locks:
+    - src/huesignal/programs/scheduler.py
+    priority: 5
+    status: verified
+    created_at: '2026-01-03T05:29:30.091146+00:00'
+    updated_at: '2026-01-03T05:50:06.708833+00:00'
+    completed_by: A7B8E4DC7
+    completed_at: &id034 2026-01-03 05:50:06.708833+00:00
+    verified_by: A7B8E4DC7
+    verified_at: *id034
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-scheduler'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E012:
+    title: Create programs/loader.py for YAML program parsing
+    description: 'WHAT: Create load_program() to parse YAML files into Program objects
+
+      WHERE: src/huesignal/programs/loader.py (new file)
+
+      WHY: Enable YAML-defined effect programs (EFFECTS_PRD.md #feature-yaml-loader)
+
+      SCOPE: Parsing only. Add pyyaml dependency if needed.
+
+      ACCEPT: 1) Valid YAML loads 2) Invalid YAML errors clearly 3) Effect names validated
+
+      REFS: See example YAML format in PRD'
+    acceptance_criteria:
+    - load_program(path) returns Program object
+    - Invalid YAML raises descriptive ValueError
+    - Unknown effect names are caught and reported
+    - Missing required fields raise clear errors
+    depends_on:
+    - E010
+    labels:
+    - programs
+    locks:
+    - src/huesignal/programs/loader.py
+    priority: 5
+    status: verified
+    created_at: '2026-01-03T05:29:34.431470+00:00'
+    updated_at: '2026-01-03T05:53:38.799446+00:00'
+    completed_by: A91695C86
+    completed_at: &id035 2026-01-03 05:53:38.799446+00:00
+    verified_by: A91695C86
+    verified_at: *id035
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-yaml-loader'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685
+  E013:
+    title: Add 'effect play' command to CLI
+    description: 'WHAT: Add CLI command to execute YAML effect programs
+
+      WHERE: src/huesignal/cli.py
+
+      WHY: User-facing entry point for programs (EFFECTS_PRD.md #feature-play-command)
+
+      SCOPE: CLI integration only. Uses existing Scheduler and Loader.
+
+      ACCEPT: 1) effect play works 2) --dry-run previews 3) Ctrl+C restores 4) Exit
+      codes correct
+
+      REFS: Follow effect apply command pattern'
+    acceptance_criteria:
+    - effect play program.yaml executes the program
+    - --dry-run shows what would happen without execution
+    - Ctrl+C restores lights to original state
+    - Exit code 0 for success, non-zero for failures
+    depends_on:
+    - E011
+    - E012
+    labels:
+    - cli
+    locks:
+    - src/huesignal/cli.py
+    priority: 6
+    status: verified
+    created_at: '2026-01-03T05:29:38.714534+00:00'
+    updated_at: '2026-01-03T05:56:42.842975+00:00'
+    completed_by: A91695C86
+    completed_at: &id036 2026-01-03 05:56:42.842975+00:00
+    verified_by: A91695C86
+    verified_at: *id036
+    prd:
+      source: EFFECTS_PRD.md
+      refs:
+      - anchor: '#feature-play-command'
+        lines: null
+      excerpt: null
+      prd_hash: 77bf42427684962e001dfbd972c4178f8ce7593aed574a338d365a62a7e42685

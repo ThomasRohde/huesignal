@@ -4,9 +4,196 @@ import pytest
 
 from huesignal.effects.base import (
     EffectOptions,
+    EffectParam,
     validate_brightness,
 )
 from huesignal.effects.colors import parse_color, rgb_to_xy
+from huesignal.effects.pulse import Pulse
+
+
+class TestEffectParam:
+    """Tests for EffectParam dataclass."""
+
+    def test_effect_param_creation(self):
+        """Test creating an EffectParam."""
+        param = EffectParam(name="count", type=int, default=1, description="Number of cycles")
+        assert param.name == "count"
+        assert param.type is int
+        assert param.default == 1
+        assert param.description == "Number of cycles"
+
+    def test_effect_param_with_string_type(self):
+        """Test EffectParam with string type."""
+        param = EffectParam(name="color", type=str, default="red", description="Color to use")
+        assert param.type is str
+        assert param.default == "red"
+
+    def test_effect_param_with_none_default(self):
+        """Test EffectParam with None as default."""
+        param = EffectParam(name="optional_value", type=int, default=None, description="Optional parameter")
+        assert param.default is None
+
+
+class TestEffectParamsIntrospection:
+    """Tests for effect parameter introspection."""
+
+    def test_pulse_has_params(self):
+        """Test that Pulse effect declares params."""
+        assert hasattr(Pulse, "params")
+        assert isinstance(Pulse.params, list)
+        assert len(Pulse.params) > 0
+
+    def test_pulse_params_structure(self):
+        """Test Pulse params have correct structure."""
+        params = Pulse.params
+
+        # Check we have count and interval_ms
+        param_names = [p.name for p in params]
+        assert "count" in param_names
+        assert "interval_ms" in param_names
+
+    def test_pulse_count_param(self):
+        """Test Pulse count parameter definition."""
+        params = Pulse.params
+        count_param = next(p for p in params if p.name == "count")
+
+        assert count_param.type is int
+        assert count_param.default == 1
+        assert "cycle" in count_param.description.lower()
+
+    def test_pulse_interval_param(self):
+        """Test Pulse interval_ms parameter definition."""
+        params = Pulse.params
+        interval_param = next(p for p in params if p.name == "interval_ms")
+
+        assert interval_param.type is int
+        assert interval_param.default == 500
+        assert "millisecond" in interval_param.description.lower()
+
+    def test_get_params_classmethod(self):
+        """Test get_params() class method works without instantiation."""
+        params = Pulse.get_params()
+
+        assert isinstance(params, list)
+        assert len(params) > 0
+        assert all(isinstance(p, EffectParam) for p in params)
+
+    def test_get_params_returns_class_params(self):
+        """Test get_params() returns the class-level params list."""
+        params = Pulse.get_params()
+        assert params is Pulse.params
+
+
+class TestToPrimitives:
+    """Tests for to_primitives() effect conversion."""
+
+    def test_pulse_to_primitives_returns_list(self):
+        """Test Pulse.to_primitives() returns a list."""
+        from unittest.mock import MagicMock
+
+        mock_bridge = MagicMock()
+        options = EffectOptions()
+        pulse = Pulse(bridge=mock_bridge, light_ids=["light-1"], options=options)
+
+        primitives = pulse.to_primitives()
+
+        assert isinstance(primitives, list)
+        assert len(primitives) > 0
+
+    def test_pulse_to_primitives_count_one(self):
+        """Test Pulse with count=1 generates correct number of primitives."""
+        from unittest.mock import MagicMock
+
+        mock_bridge = MagicMock()
+        options = EffectOptions()
+        pulse = Pulse(bridge=mock_bridge, light_ids=["light-1"], options=options, count=1)
+
+        primitives = pulse.to_primitives()
+
+        # One cycle = 2 SetState + 2 Wait = 4 primitives
+        assert len(primitives) == 4
+
+    def test_pulse_to_primitives_count_three(self):
+        """Test Pulse with count=3 generates correct number of primitives."""
+        from unittest.mock import MagicMock
+
+        mock_bridge = MagicMock()
+        options = EffectOptions()
+        pulse = Pulse(bridge=mock_bridge, light_ids=["light-1"], options=options, count=3)
+
+        primitives = pulse.to_primitives()
+
+        # Three cycles = 3 * (2 SetState + 2 Wait) = 12 primitives
+        assert len(primitives) == 12
+
+    def test_pulse_to_primitives_types(self):
+        """Test Pulse to_primitives returns SetState and Wait primitives."""
+        from unittest.mock import MagicMock
+
+        from huesignal.effects.primitives import SetState, Wait
+
+        mock_bridge = MagicMock()
+        options = EffectOptions()
+        pulse = Pulse(bridge=mock_bridge, light_ids=["light-1"], options=options, count=1)
+
+        primitives = pulse.to_primitives()
+
+        # Check primitive types
+        assert isinstance(primitives[0], SetState)  # Pulse down
+        assert isinstance(primitives[1], Wait)  # Wait
+        assert isinstance(primitives[2], SetState)  # Pulse up
+        assert isinstance(primitives[3], Wait)  # Wait
+
+    def test_pulse_to_primitives_brightness_sequence(self):
+        """Test Pulse to_primitives creates correct brightness sequence."""
+        from unittest.mock import MagicMock
+
+        mock_bridge = MagicMock()
+        options = EffectOptions(brightness=200)
+        pulse = Pulse(bridge=mock_bridge, light_ids=["light-1"], options=options, count=1)
+
+        primitives = pulse.to_primitives()
+
+        # First SetState should dim to 1
+        assert primitives[0].brightness == 1
+        # Third primitive (second SetState) should go to target brightness
+        assert primitives[2].brightness == 200
+
+    def test_pulse_to_primitives_with_color(self):
+        """Test Pulse to_primitives includes color."""
+        from unittest.mock import MagicMock
+
+        from huesignal.effects.primitives import SetState
+
+        mock_bridge = MagicMock()
+        options = EffectOptions(color="blue")
+        pulse = Pulse(bridge=mock_bridge, light_ids=["light-1"], options=options)
+
+        primitives = pulse.to_primitives()
+
+        # Both SetState primitives should have the color
+        set_states = [p for p in primitives if isinstance(p, SetState)]
+        assert all(s.color == "blue" for s in set_states)
+
+    def test_pulse_to_primitives_custom_interval(self):
+        """Test Pulse to_primitives respects custom interval_ms."""
+        from unittest.mock import MagicMock
+
+        from huesignal.effects.primitives import SetState, Wait
+
+        mock_bridge = MagicMock()
+        options = EffectOptions()
+        pulse = Pulse(bridge=mock_bridge, light_ids=["light-1"], options=options, interval_ms=1000)
+
+        primitives = pulse.to_primitives()
+
+        # SetState primitives should use the interval
+        set_states = [p for p in primitives if isinstance(p, SetState)]
+        assert all(s.transition_ms == 1000 for s in set_states)
+
+        # Wait primitives should be interval + buffer
+        waits = [p for p in primitives if isinstance(p, Wait)]
+        assert all(w.duration_ms == 1100 for w in waits)
 
 
 class TestValidateBrightness:

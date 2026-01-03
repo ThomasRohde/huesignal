@@ -2,8 +2,9 @@
 
 import asyncio
 import time
+from typing import Any, ClassVar
 
-from huesignal.effects.base import Effect, EffectOptions, register_effect
+from huesignal.effects.base import Effect, EffectOptions, EffectParam, register_effect
 
 
 @register_effect
@@ -12,6 +13,17 @@ class BreatheEffect(Effect):
 
     name = "breathe"
     description = "Smooth breathing effect for long-running job completion signal"
+    params: ClassVar[list[EffectParam]] = [
+        EffectParam(
+            name="duration_ms",
+            type=int,
+            default=4000,
+            description="Total duration of the breathe effect in milliseconds",
+        ),
+        EffectParam(
+            name="period_ms", type=int, default=2000, description="Time for one complete breath cycle in milliseconds"
+        ),
+    ]
 
     def __init__(
         self,
@@ -33,6 +45,77 @@ class BreatheEffect(Effect):
         super().__init__(bridge, light_ids, options)
         self.duration_ms = duration_ms
         self.period_ms = period_ms
+
+    def to_primitives(self) -> list[Any]:
+        """Convert breathe effect to sequence of primitives with rate limiting.
+
+        Returns:
+            List of SetState and Wait primitives that implement the breathe effect.
+        """
+        from huesignal.effects.primitives import SetState, Wait
+
+        primitives: list[Any] = []
+
+        # Calculate parameters (same logic as _apply_effect)
+        num_steps = 20  # Number of brightness steps per half-cycle
+        min_brightness = 1
+        max_brightness = 254
+
+        # If brightness option is set, use it as the max
+        if self.options.brightness:
+            max_brightness = self.options.brightness
+
+        # Calculate timing
+        half_cycle_ms = self.period_ms / 2
+        step_duration_ms = half_cycle_ms / num_steps
+
+        # Minimum update interval to avoid bridge overload (rate limiting)
+        min_interval_ms = 50  # Rate limit: max 20 updates per second
+        actual_step_duration_ms = max(step_duration_ms, min_interval_ms)
+
+        # Adjust number of steps if we're rate limited
+        adjusted_steps = max(1, int(half_cycle_ms / actual_step_duration_ms))
+
+        # Calculate total time for one complete cycle with actual timing
+        actual_cycle_ms = adjusted_steps * actual_step_duration_ms * 2
+
+        # Number of complete cycles to fit within duration
+        num_cycles = max(1, int(self.duration_ms / actual_cycle_ms))
+
+        for _ in range(num_cycles):
+            # Fade in (low to high brightness)
+            for step in range(adjusted_steps):
+                # Linear interpolation from min to max
+                progress = step / adjusted_steps
+                brightness = int(min_brightness + (max_brightness - min_brightness) * progress)
+
+                primitives.append(
+                    SetState(
+                        on=True,
+                        brightness=brightness,
+                        color=self.options.color,
+                        transition_ms=0,  # Instant steps for smooth breathing
+                    )
+                )
+                primitives.append(Wait(duration_ms=int(actual_step_duration_ms)))
+
+            # Fade out (high to low brightness)
+            for step in range(adjusted_steps):
+                # Linear interpolation from max to min
+                progress = step / adjusted_steps
+                brightness = int(max_brightness - (max_brightness - min_brightness) * progress)
+
+                primitives.append(
+                    SetState(
+                        on=True,
+                        brightness=brightness,
+                        color=self.options.color,
+                        transition_ms=0,  # Instant steps for smooth breathing
+                    )
+                )
+                primitives.append(Wait(duration_ms=int(actual_step_duration_ms)))
+
+        return primitives
 
     async def _apply_effect(self) -> None:
         """Apply the breathe effect with rate-limited brightness changes."""

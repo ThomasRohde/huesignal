@@ -1,10 +1,11 @@
 """Blink effect implementation."""
 
 import asyncio
+from typing import Any, ClassVar
 
 from aiohue.v2 import HueBridgeV2
 
-from huesignal.effects.base import Effect, EffectOptions, register_effect
+from huesignal.effects.base import Effect, EffectOptions, EffectParam, register_effect
 
 
 @register_effect
@@ -13,6 +14,10 @@ class Blink(Effect):
 
     name = "blink"
     description = "Blink lights on and off"
+    params: ClassVar[list[EffectParam]] = [
+        EffectParam(name="count", type=int, default=3, description="Number of blinks"),
+        EffectParam(name="interval_ms", type=int, default=500, description="Time between blinks in milliseconds"),
+    ]
 
     def __init__(
         self,
@@ -34,6 +39,42 @@ class Blink(Effect):
         super().__init__(bridge, light_ids, options)
         self.count = count
         self.interval_ms = interval_ms
+
+    def to_primitives(self) -> list[Any]:
+        """Convert blink effect to sequence of primitives.
+
+        Returns:
+            List of SetState and Wait primitives that implement the blink effect.
+        """
+        from huesignal.effects.primitives import SetState, Wait
+
+        primitives: list[Any] = []
+        interval_s = self.interval_ms / 1000.0
+
+        for _ in range(self.count):
+            # Blink OFF
+            primitives.append(
+                SetState(
+                    on=False,
+                    brightness=None,
+                    color=None,
+                    transition_ms=0,  # Instant transition for blink effect
+                )
+            )
+            primitives.append(Wait(duration_ms=self.interval_ms))
+
+            # Blink ON with color/brightness from options
+            primitives.append(
+                SetState(
+                    on=True,
+                    brightness=self.options.brightness,
+                    color=self.options.color,
+                    transition_ms=0,  # Instant transition for blink effect
+                )
+            )
+            primitives.append(Wait(duration_ms=self.interval_ms))
+
+        return primitives
 
     async def _apply_effect(self) -> None:
         """Apply the blink effect to all lights.

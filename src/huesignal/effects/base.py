@@ -2,11 +2,31 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any, ClassVar
 
 from aiohue.v2 import HueBridgeV2
 
 from huesignal.effects.colors import parse_color, rgb_to_xy
 from huesignal.state import StateSnapshot
+
+
+@dataclass
+class EffectParam:
+    """Declarative parameter definition for effects.
+
+    Enables CLI introspection and validation of effect parameters.
+
+    Attributes:
+        name: Parameter name (must match constructor kwarg)
+        type: Parameter type (e.g., int, str, bool)
+        default: Default value if not specified
+        description: Human-readable parameter description
+    """
+
+    name: str
+    type: type
+    default: Any
+    description: str
 
 
 @dataclass
@@ -75,6 +95,7 @@ class Effect(ABC):
 
     name: str = "base"
     description: str = "Base effect class"
+    params: ClassVar[list[EffectParam]] = []
 
     def __init__(
         self,
@@ -97,6 +118,31 @@ class Effect(ABC):
         # Validate options
         if self.options.brightness is not None:
             validate_brightness(self.options.brightness)
+
+    @classmethod
+    def get_params(cls) -> list[EffectParam]:
+        """Get parameter definitions for this effect.
+
+        Returns:
+            List of EffectParam definitions for introspection
+        """
+        return cls.params
+
+    def to_primitives(self) -> list[Any]:
+        """Convert this effect to a sequence of primitives.
+
+        Optional method that effects can implement to support primitive-based
+        execution. This enables composition and scheduling in timeline programs.
+
+        Returns:
+            List of primitive operations (SetState, Wait, etc.)
+
+        Note:
+            If not implemented, effect will use _apply_effect() fallback.
+        """
+        # Default: not implemented
+        # Effects that support primitive-based execution should override this
+        return []
 
     async def apply(self) -> list[str]:
         """Apply the effect to the lights.

@@ -1,0 +1,17 @@
+name: task-complete-celebration
+description: Visual feedback for successful task completion
+
+tracks:
+  - light: PC
+    steps:
+      - effect: pulse
+        options:
+          color: "#00ff00"
+          count: 2
+        duration_ms: 1500
+      - wait: 300
+      - effect: pulse
+        options:
+          color: "#0000ff"
+          count: 1
+        duration_ms: 800

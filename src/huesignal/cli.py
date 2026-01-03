@@ -675,6 +675,62 @@ def effect_list(ctx: typer.Context) -> None:
             typer.echo(f"  {name:<25} {description}")
 
 
+@effect_app.command(name="params")
+def effect_params(
+    ctx: typer.Context,
+    effect_name: str = typer.Argument(..., help="Effect name to show parameters for"),
+) -> None:
+    """Show parameters for a specific effect.
+
+    Display available parameters with their types, defaults, and descriptions.
+    Use this to discover what parameters each effect accepts.
+
+    Examples:
+      huesignal effect params pulse
+      huesignal effect params blink --json
+    """
+    from huesignal.effects import get_effect_class
+
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    # Get effect class
+    effect_class = get_effect_class(effect_name)
+    if effect_class is None:
+        typer.secho(
+            f"Error: Unknown effect '{effect_name}'. Use 'effect list' to see available effects.", fg=typer.colors.RED
+        )
+        raise typer.Exit(1)
+
+    # Get parameters
+    params = effect_class.get_params()
+
+    if opts.json_output:
+        import json
+
+        param_list = [
+            {
+                "name": p.name,
+                "type": p.type.__name__ if hasattr(p.type, "__name__") else str(p.type),
+                "default": p.default,
+                "description": p.description,
+            }
+            for p in params
+        ]
+        typer.echo(json.dumps({"effect": effect_name, "parameters": param_list, "count": len(param_list)}, indent=2))
+    else:
+        if not params:
+            typer.echo(f"Effect '{effect_name}' has no parameters.")
+            return
+
+        typer.echo(f"\nParameters for effect '{effect_name}':\n")
+        for p in params:
+            type_name = p.type.__name__ if hasattr(p.type, "__name__") else str(p.type)
+            typer.echo(f"  {p.name:<20} (type: {type_name}, default: {p.default})")
+            typer.echo(f"    {p.description}")
+            typer.echo()
+
+
 @effect_app.command()
 def apply(
     ctx: typer.Context,
@@ -693,6 +749,7 @@ def apply(
     ),
     duration: int = typer.Option(1000, "--duration", "-d", help="Effect duration in milliseconds (default: 1000)"),
     count: int = typer.Option(1, "--count", help="Number of cycles/repeats for pulse/blink effects (default: 1)"),
+    param: list[str] = typer.Option([], "--param", "-p", help="Effect parameter in key=value format (repeatable)"),
     no_restore: bool = typer.Option(
         False,
         "--no-restore",
@@ -832,11 +889,46 @@ def apply(
                     typer.secho(f"Error: {e}", fg=typer.colors.RED)
                     raise typer.Exit(1)
 
-            # Create and apply effect
-            if effect_name in ("pulse", "blink"):
-                effect = effect_class(client.bridge, light_ids, effect_options, count=count)
-            else:
-                effect = effect_class(client.bridge, light_ids, effect_options)
+            # Parse effect parameters
+            effect_params = {}
+
+            # Add backward compatibility: --count option sets 'count' param
+            if count != 1:
+                effect_params["count"] = count
+
+            # Parse --param options (these override --count if both specified)
+            for p in param:
+                if "=" not in p:
+                    typer.secho(f"Error: Invalid parameter format '{p}'. Expected key=value", fg=typer.colors.RED)
+                    raise typer.Exit(1)
+                key, value = p.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+
+                # Try to parse value as int
+                try:
+                    value = int(value)
+                except ValueError:
+                    pass  # Keep as string if not an int
+
+                effect_params[key] = value
+
+            # Validate parameters against effect's declared params
+            if effect_params:
+                effect_param_defs = effect_class.get_params()
+                valid_param_names = {p.name for p in effect_param_defs}
+
+                for key in effect_params:
+                    if key not in valid_param_names:
+                        typer.secho(
+                            f"Error: Unknown parameter '{key}' for effect '{effect_name}'. "
+                            f"Valid parameters: {', '.join(sorted(valid_param_names))}",
+                            fg=typer.colors.RED,
+                        )
+                        raise typer.Exit(1)
+
+            # Create and apply effect with parameters
+            effect = effect_class(client.bridge, light_ids, effect_options, **effect_params)
 
             failed_lights = await effect.apply()
 
@@ -881,6 +973,200 @@ def apply(
         exit_code = asyncio.run(run_effect())
         if exit_code and exit_code != 0:
             raise typer.Exit(exit_code)
+    except Exception as e:
+        if opts.json_output:
+            import json
+
+            typer.echo(json.dumps({"success": False, "error": str(e)}, indent=2))
+        elif opts.trace:
+            raise
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@effect_app.command()
+def play(
+    ctx: typer.Context,
+    program_file: str = typer.Argument(..., help="Path to YAML program file"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview program without execution"),
+    no_restore: bool = typer.Option(False, "--no-restore", help="Don't restore lights to original state after program"),
+) -> None:
+    """Execute a YAML effect program.
+
+    Programs enable multi-light choreography with sequenced effects.
+    See EFFECTS_PRD.md for YAML format documentation.
+
+    Example:
+        huesignal effect play celebration.yaml
+        huesignal effect play sequence.yaml --dry-run
+        huesignal effect play show.yaml --no-restore
+
+    The program will execute all tracks in parallel with proper timing.
+    Press Ctrl+C to interrupt and restore lights to original state.
+    """
+    from pathlib import Path
+
+    from huesignal.effects.context import ExecutionContext
+    from huesignal.programs import Scheduler, load_program
+
+    # Get global options from context
+    opts = ctx.obj if isinstance(ctx.obj, GlobalOptions) else GlobalOptions()
+
+    # Validate file exists
+    program_path = Path(program_file)
+    if not program_path.exists():
+        typer.secho(f"Error: Program file not found: {program_file}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Load program
+    try:
+        program = load_program(program_file)
+        if not opts.quiet:
+            typer.echo(f"Loaded program: {program.name}")
+            if program.description:
+                typer.echo(f"Description: {program.description}")
+    except ValueError as e:
+        typer.secho(f"Error loading program: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        if opts.trace:
+            raise
+        raise typer.Exit(1)
+
+    # Dry-run mode: show what would happen
+    if dry_run:
+        typer.echo("\n[DRY RUN MODE - No effects will be applied]\n")
+        typer.echo(f"Program: {program.name}")
+        typer.echo(f"Total duration: {program.total_duration_ms()}ms ({program.total_duration_ms() / 1000:.1f}s)")
+        typer.echo(f"Tracks: {len(program.tracks)}\n")
+
+        for i, track in enumerate(program.tracks, 1):
+            typer.echo(f"Track {i}: {track.light_pattern}")
+            typer.echo(f"  Duration: {track.duration_ms()}ms")
+            typer.echo(f"  Steps: {len(track.steps)}")
+            for j, step in enumerate(track.steps, 1):
+                action = step.action
+                action_str = f"{action.__class__.__name__}"
+                if hasattr(action, "effect_name"):
+                    action_str = f"Effect: {action.effect_name}"
+                elif hasattr(action, "duration_ms"):
+                    action_str = f"Wait: {action.duration_ms}ms"
+                typer.echo(f"    {j}. [{step.start_ms}ms] {action_str} ({step.duration_ms}ms)")
+            typer.echo()
+
+        return
+
+    # Get bridge IP
+    bridge_ip = get_bridge_ip(opts.bridge_ip, opts.quiet)
+
+    # Get credentials
+    try:
+        app_key = get_app_key()
+        if not app_key:
+            typer.secho("Error: No app key found. Please run 'huesignal auth login' first.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    except AuthError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Execute program
+    async def run_program():
+        async with HueClient(bridge_ip, app_key) as client:
+            # Create execution context
+            ctx_exec = ExecutionContext(bridge=client.bridge)
+            scheduler = Scheduler(ctx_exec)
+
+            if not opts.quiet:
+                typer.echo(f"\nExecuting program: {program.name}")
+                typer.echo(f"Tracks: {len(program.tracks)}")
+                typer.echo(f"Duration: {program.total_duration_ms() / 1000:.1f}s\n")
+
+            try:
+                # Execute with state restoration unless disabled
+                restore = not no_restore
+                result = await scheduler.run_program(program, restore_state=restore)
+
+                # Report results
+                if opts.json_output:
+                    import json
+
+                    track_data = []
+                    for tr in result.track_results:
+                        track_data.append(
+                            {
+                                "light_pattern": tr.light_pattern,
+                                "light_ids": tr.light_ids,
+                                "failed_lights": tr.failed_lights,
+                                "errors": tr.errors,
+                            }
+                        )
+
+                    output = {
+                        "success": result.success,
+                        "program_name": result.program_name,
+                        "tracks": track_data,
+                        "total_failed_lights": result.total_failed_lights,
+                        "restoration_failures": result.restoration_failures,
+                    }
+                    typer.echo(json.dumps(output, indent=2))
+
+                    # Exit code based on success
+                    if not result.success:
+                        return 2
+                elif not opts.quiet:
+                    # Display track results
+                    for i, tr in enumerate(result.track_results, 1):
+                        typer.echo(f"Track {i} ({tr.light_pattern}): {len(tr.light_ids)} light(s)")
+                        if tr.failed_lights:
+                            typer.secho(f"  Failed: {', '.join(tr.failed_lights)}", fg=typer.colors.YELLOW)
+                        if tr.errors:
+                            for error in tr.errors:
+                                typer.secho(f"  Error: {error}", fg=typer.colors.RED)
+
+                    # Final status
+                    if result.success:
+                        typer.secho("\nProgram completed successfully!", fg=typer.colors.GREEN)
+                    else:
+                        typer.secho("\nProgram completed with errors.", fg=typer.colors.YELLOW)
+                        if result.total_failed_lights:
+                            typer.echo(f"Failed lights: {', '.join(result.total_failed_lights)}")
+                        if result.restoration_failures:
+                            typer.echo(f"Restoration failures: {', '.join(result.restoration_failures)}")
+                        return 2
+                elif not result.success:
+                    # Quiet mode but signal failure
+                    return 2
+
+            except KeyboardInterrupt:
+                # Handle Ctrl+C gracefully
+                if not opts.quiet:
+                    typer.echo("\n\nInterrupted! Restoring lights...")
+
+                # Restore state
+                if not no_restore:
+                    try:
+                        restoration_failures = await ctx_exec.restore_state()
+                        if restoration_failures and not opts.quiet:
+                            typer.secho(
+                                f"Warning: Failed to restore {len(restoration_failures)} light(s)",
+                                fg=typer.colors.YELLOW,
+                            )
+                    except Exception as restore_err:
+                        if not opts.quiet:
+                            typer.secho(f"Error during restoration: {restore_err}", fg=typer.colors.RED)
+
+                if not opts.quiet:
+                    typer.echo("Interrupted.")
+                raise typer.Exit(130)  # Standard exit code for Ctrl+C
+
+    try:
+        exit_code = asyncio.run(run_program())
+        if exit_code and exit_code != 0:
+            raise typer.Exit(exit_code)
+    except KeyboardInterrupt:
+        raise typer.Exit(130)
     except Exception as e:
         if opts.json_output:
             import json

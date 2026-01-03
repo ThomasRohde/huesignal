@@ -34,6 +34,7 @@ dependencies = [
     "httpx",
     "zeroconf",
     "keyring",
+    "pyyaml>=6.0",
 ]
 
 [project.urls]
